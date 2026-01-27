@@ -1,9 +1,10 @@
 from flask import Flask
-from .core.config import load_config
+from .core.config import load_config, apply_overrides
 from .core.db import init_db
 from .services.sms_retry import start_sms_retry_loop
 from .services.password_expiry import start_password_expiry_loop
 from .adapters.ldap_client import LDAPClient
+from .services.config_service import get_config
 from .api.routes import api_bp
 
 
@@ -12,6 +13,9 @@ def create_app() -> Flask:
     app.config.update(load_config())
     if app.config.get("DB_URL"):
         init_db(app.config["DB_URL"])
+        overrides = get_config(app.config["DB_URL"])
+        if overrides:
+            apply_overrides(app.config, overrides)
         if app.config.get("SMS_AUTO_RETRY"):
             start_sms_retry_loop(
                 db_url=app.config["DB_URL"],
@@ -38,6 +42,8 @@ def create_app() -> Flask:
                 aliyun_sign_name=app.config["ALIYUN_SMS_SIGN_NAME"],
                 aliyun_template_code=app.config["ALIYUN_SMS_TEMPLATE_NOTIFY"],
             )
+        app.config["SMS_RETRY_LOOP_STARTED"] = app.config.get("SMS_AUTO_RETRY", False)
+        app.config["EXPIRY_LOOP_STARTED"] = app.config.get("PASSWORD_EXPIRY_ENABLE", False)
 
     app.register_blueprint(api_bp, url_prefix="/api")
     return app

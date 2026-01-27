@@ -44,3 +44,31 @@ def load_config() -> dict:
         "PASSWORD_EXPIRY_DAYS": os.getenv("PASSWORD_EXPIRY_DAYS", "7,3,1"),
         "PASSWORD_EXPIRY_CHECK_INTERVAL": _get_int("PASSWORD_EXPIRY_CHECK_INTERVAL", 3600),
     }
+
+
+def _to_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).lower() in {"1", "true", "yes", "on"}
+
+
+def apply_overrides(config: dict, overrides: dict) -> dict:
+    for key, value in overrides.items():
+        if key in {"PASSWORD_EXPIRY_ENABLE", "SMS_AUTO_RETRY"}:
+            config[key] = _to_bool(value)
+        elif key in {
+            "SMS_SEND_INTERVAL",
+            "SMS_CODE_TTL",
+            "PASSWORD_EXPIRY_CHECK_INTERVAL",
+            "LOGIN_MAX_FAILS",
+            "LOGIN_LOCK_MINUTES",
+        }:
+            try:
+                config[key] = int(value)
+            except Exception:
+                pass
+        else:
+            config[key] = value
+    return config

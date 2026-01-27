@@ -101,6 +101,7 @@ docker compose up --build
 - Config
   - `GET /api/config`
   - `PUT /api/config`
+  - Saved config overrides runtime and can start SMS retry / expiry loops when enabled
 - User/OU management
   - `GET /api/users` / `POST /api/users` / `PUT /api/users/:username`
   - `PATCH /api/users/:username/status` / `POST /api/users/:username/reset-password`

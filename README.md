@@ -101,6 +101,7 @@ docker compose up --build
 - 配置中心
   - `GET /api/config`
   - `PUT /api/config`
+  - 保存后会覆盖运行时配置，并可在开启时自动启动短信重试/到期提醒后台任务
 - 用户/OU 管理
   - `GET /api/users` / `POST /api/users` / `PUT /api/users/:username`
   - `PATCH /api/users/:username/status` / `POST /api/users/:username/reset-password`

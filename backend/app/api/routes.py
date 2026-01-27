@@ -18,6 +18,9 @@ from ..services.password_expiry import trigger_password_expiry_check
 from ..services.notify_service import list_expiry_notifies
 from ..services.auth_service import clear_fail, is_locked, record_fail
 from ..services.config_service import get_config, set_config
+from ..core.config import apply_overrides
+from ..services.sms_retry import start_sms_retry_loop
+from ..services.password_expiry import start_password_expiry_loop
 from ..core.errors import ADConnectionError
 
 api_bp = Blueprint("api", __name__)
@@ -669,4 +672,27 @@ def config_set():
     payload = request.get_json(silent=True) or {}
     for key, value in payload.items():
         set_config(current_app.config["DB_URL"], key, value)
+    apply_overrides(current_app.config, payload)
+    if current_app.config.get("SMS_AUTO_RETRY") and not current_app.config.get("SMS_RETRY_LOOP_STARTED"):
+        start_sms_retry_loop(
+            db_url=current_app.config["DB_URL"],
+            interval_seconds=current_app.config["SMS_RETRY_INTERVAL"],
+            access_key_id=current_app.config["ALIYUN_ACCESS_KEY_ID"],
+            access_key_secret=current_app.config["ALIYUN_ACCESS_KEY_SECRET"],
+            sign_name=current_app.config["ALIYUN_SMS_SIGN_NAME"],
+            template_code=current_app.config["ALIYUN_SMS_TEMPLATE_RESET"],
+        )
+        current_app.config["SMS_RETRY_LOOP_STARTED"] = True
+    if current_app.config.get("PASSWORD_EXPIRY_ENABLE") and not current_app.config.get("EXPIRY_LOOP_STARTED"):
+        start_password_expiry_loop(
+            ldap_client_factory=lambda: _ldap_client(),
+            db_url=current_app.config["DB_URL"],
+            days_value=current_app.config["PASSWORD_EXPIRY_DAYS"],
+            interval_seconds=current_app.config["PASSWORD_EXPIRY_CHECK_INTERVAL"],
+            aliyun_access_key_id=current_app.config["ALIYUN_ACCESS_KEY_ID"],
+            aliyun_access_key_secret=current_app.config["ALIYUN_ACCESS_KEY_SECRET"],
+            aliyun_sign_name=current_app.config["ALIYUN_SMS_SIGN_NAME"],
+            aliyun_template_code=current_app.config["ALIYUN_SMS_TEMPLATE_NOTIFY"],
+        )
+        current_app.config["EXPIRY_LOOP_STARTED"] = True
     return jsonify({"status": "ok"})
