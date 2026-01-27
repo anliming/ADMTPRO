@@ -1,0 +1,44 @@
+import os
+from dotenv import load_dotenv
+
+
+def _get_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def load_config() -> dict:
+    load_dotenv()
+    return {
+        "APP_ENV": os.getenv("APP_ENV", "development"),
+        "APP_SECRET": os.getenv("APP_SECRET", "change-me"),
+        "API_HOST": os.getenv("API_HOST", "0.0.0.0"),
+        "API_PORT": _get_int("API_PORT", 8000),
+        "SESSION_TTL": _get_int("SESSION_TTL", 1800),
+        "DB_URL": os.getenv("DB_URL", ""),
+        "SMS_CODE_TTL": _get_int("SMS_CODE_TTL", 300),
+        "SMS_SEND_INTERVAL": _get_int("SMS_SEND_INTERVAL", 60),
+        "LDAP_URL": os.getenv("LDAP_URL", ""),
+        "LDAP_BIND_DN": os.getenv("LDAP_BIND_DN", ""),
+        "LDAP_BIND_PASSWORD": os.getenv("LDAP_BIND_PASSWORD", ""),
+        "LDAP_BASE_DN": os.getenv("LDAP_BASE_DN", ""),
+        "LDAP_CA_CERT": os.getenv("LDAP_CA_CERT", ""),
+        "ADMIN_GROUP_DN": os.getenv("ADMIN_GROUP_DN", ""),
+        "OTP_ISSUER": os.getenv("OTP_ISSUER", "ADMTPRO"),
+        "OTP_WINDOW": _get_int("OTP_WINDOW", 30),
+        "ALIYUN_ACCESS_KEY_ID": os.getenv("ALIYUN_ACCESS_KEY_ID", ""),
+        "ALIYUN_ACCESS_KEY_SECRET": os.getenv("ALIYUN_ACCESS_KEY_SECRET", ""),
+        "ALIYUN_SMS_SIGN_NAME": os.getenv("ALIYUN_SMS_SIGN_NAME", ""),
+        "ALIYUN_SMS_TEMPLATE_RESET": os.getenv("ALIYUN_SMS_TEMPLATE_RESET", ""),
+        "ALIYUN_SMS_TEMPLATE_NOTIFY": os.getenv("ALIYUN_SMS_TEMPLATE_NOTIFY", ""),
+        "SMS_AUTO_RETRY": os.getenv("SMS_AUTO_RETRY", "false").lower() == "true",
+        "SMS_RETRY_INTERVAL": _get_int("SMS_RETRY_INTERVAL", 300),
+        "PASSWORD_EXPIRY_ENABLE": os.getenv("PASSWORD_EXPIRY_ENABLE", "false").lower() == "true",
+        "PASSWORD_EXPIRY_DAYS": os.getenv("PASSWORD_EXPIRY_DAYS", "7,3,1"),
+        "PASSWORD_EXPIRY_CHECK_INTERVAL": _get_int("PASSWORD_EXPIRY_CHECK_INTERVAL", 3600),
+    }

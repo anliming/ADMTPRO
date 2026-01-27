@@ -1,0 +1,280 @@
+import ssl
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+from ldap3 import Server, Connection, ALL, BASE, MODIFY_REPLACE, Tls
+from ldap3.core.exceptions import LDAPException
+
+from ..core.errors import ADConnectionError, ADAuthError
+
+
+class LDAPClient:
+    def __init__(self, url: str, bind_dn: str, bind_password: str, base_dn: str, ca_cert: str) -> None:
+        self.url = url
+        self.bind_dn = bind_dn
+        self.bind_password = bind_password
+        self.base_dn = base_dn
+        self.ca_cert = ca_cert
+
+    def _server(self) -> Server:
+        tls = None
+        if self.url.lower().startswith("ldaps") and self.ca_cert:
+            tls = Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=self.ca_cert)
+        return Server(self.url, get_info=ALL, tls=tls)
+
+    def _service_conn(self) -> Connection:
+        try:
+            conn = Connection(self._server(), user=self.bind_dn, password=self.bind_password, auto_bind=True)
+        except LDAPException as exc:
+            raise ADConnectionError(str(exc)) from exc
+        return conn
+
+    def get_user_dn(self, username: str) -> Optional[str]:
+        conn = self._service_conn()
+        search_filter = f"(sAMAccountName={username})"
+        if not conn.search(self.base_dn, search_filter, attributes=["distinguishedName"]):
+            return None
+        if not conn.entries:
+            return None
+        return str(conn.entries[0].entry_dn)
+
+    def authenticate_user(self, username: str, password: str) -> bool:
+        user_dn = self.get_user_dn(username)
+        if not user_dn:
+            return False
+        try:
+            conn = Connection(self._server(), user=user_dn, password=password, auto_bind=True)
+            conn.unbind()
+            return True
+        except LDAPException:
+            return False
+
+    def get_user_info(self, username: str) -> Optional[dict]:
+        conn = self._service_conn()
+        search_filter = f"(sAMAccountName={username})"
+        if not conn.search(
+            self.base_dn,
+            search_filter,
+            attributes=["sAMAccountName", "displayName", "mail", "mobile", "department", "title", "memberOf"],
+        ):
+            return None
+        if not conn.entries:
+            return None
+        entry = conn.entries[0]
+        return {
+            "sAMAccountName": getattr(entry, "sAMAccountName", None).value,
+            "displayName": getattr(entry, "displayName", None).value,
+            "mail": getattr(entry, "mail", None).value,
+            "mobile": getattr(entry, "mobile", None).value,
+            "department": getattr(entry, "department", None).value,
+            "title": getattr(entry, "title", None).value,
+            "memberOf": getattr(entry, "memberOf", None).values if hasattr(entry, "memberOf") else [],
+        }
+
+    def is_user_admin(self, username: str, admin_group_dn: str) -> bool:
+        if not admin_group_dn:
+            return False
+        user_dn = self.get_user_dn(username)
+        if not user_dn:
+            return False
+        conn = self._service_conn()
+        # Check membership by querying the admin group entry directly.
+        if not conn.search(
+            admin_group_dn,
+            f"(member={user_dn})",
+            search_scope=BASE,
+            attributes=["member"],
+        ):
+            return False
+        return bool(conn.entries)
+
+    def search_users(self, query: str = "", ou_dn: str = "", enabled: Optional[bool] = None) -> list[dict]:
+        conn = self._service_conn()
+        base = ou_dn or self.base_dn
+        filter_parts = ["(objectClass=user)"]
+        if query:
+            q = query.replace("*", "")
+            filter_parts.append(
+                f\"(|(sAMAccountName=*{q}*)(displayName=*{q}*)(cn=*{q}*)(mail=*{q}*)(mobile=*{q}*))\"
+            )
+        if enabled is True:
+            filter_parts.append("(!(userAccountControl:1.2.840.113556.1.4.803:=2))")
+        if enabled is False:
+            filter_parts.append("(userAccountControl:1.2.840.113556.1.4.803:=2)")
+        search_filter = f"(&{''.join(filter_parts)})"
+        conn.search(
+            base,
+            search_filter,
+            attributes=["sAMAccountName", "displayName", "mail", "mobile", "department", "title"],
+        )
+        users = []
+        for entry in conn.entries:
+            users.append(
+                {
+                    "dn": str(entry.entry_dn),
+                    "sAMAccountName": getattr(entry, "sAMAccountName", None).value,
+                    "displayName": getattr(entry, "displayName", None).value,
+                    "mail": getattr(entry, "mail", None).value,
+                    "mobile": getattr(entry, "mobile", None).value,
+                    "department": getattr(entry, "department", None).value,
+                    "title": getattr(entry, "title", None).value,
+                }
+            )
+        return users
+
+    def create_user(self, *, sAMAccountName: str, displayName: str, ou_dn: str, password: str, attributes: dict) -> None:
+        conn = self._service_conn()
+        user_dn = f"CN={displayName},{ou_dn}"
+        user_principal = f"{sAMAccountName}@{self._domain_from_base_dn()}"
+        attrs = {
+            "sAMAccountName": sAMAccountName,
+            "displayName": displayName,
+            "userPrincipalName": user_principal,
+            "objectClass": ["top", "person", "organizationalPerson", "user"],
+        }
+        attrs.update(attributes)
+        if not conn.add(user_dn, attributes=attrs):
+            raise ADConnectionError(conn.result.get("message", "add failed"))
+        self._set_password(conn, user_dn, password)
+        self._set_enabled(conn, user_dn, True)
+
+    def update_user(self, user_dn: str, changes: dict) -> None:
+        conn = self._service_conn()
+        mod = {k: [(MODIFY_REPLACE, [v])] for k, v in changes.items()}
+        if not conn.modify(user_dn, mod):
+            raise ADConnectionError(conn.result.get("message", "modify failed"))
+
+    def set_user_enabled(self, user_dn: str, enabled: bool) -> None:
+        conn = self._service_conn()
+        self._set_enabled(conn, user_dn, enabled)
+
+    def reset_password(self, user_dn: str, new_password: str) -> None:
+        conn = self._service_conn()
+        self._set_password(conn, user_dn, new_password)
+
+    def change_password(self, username: str, old_password: str, new_password: str) -> None:
+        user_dn = self.get_user_dn(username)
+        if not user_dn:
+            raise ADConnectionError("user not found")
+        try:
+            conn = Connection(self._server(), user=user_dn, password=old_password, auto_bind=True)
+        except LDAPException as exc:
+            raise ADConnectionError("old password invalid") from exc
+        self._set_password(conn, user_dn, new_password)
+
+    def delete_user(self, user_dn: str) -> None:
+        conn = self._service_conn()
+        if not conn.delete(user_dn):
+            raise ADConnectionError(conn.result.get("message", "delete failed"))
+
+    def move_user(self, user_dn: str, target_ou_dn: str) -> None:
+        conn = self._service_conn()
+        new_rdn = user_dn.split(",", 1)[0]
+        if not conn.modify_dn(user_dn, new_rdn, new_superior=target_ou_dn):
+            raise ADConnectionError(conn.result.get("message", "move failed"))
+
+    def list_ous(self, base_dn: str = "") -> list[dict]:
+        conn = self._service_conn()
+        base = base_dn or self.base_dn
+        conn.search(base, "(objectClass=organizationalUnit)", attributes=["ou", "description"])
+        ous = []
+        for entry in conn.entries:
+            ous.append(
+                {
+                    "dn": str(entry.entry_dn),
+                    "name": getattr(entry, "ou", None).value,
+                    "description": getattr(entry, "description", None).value,
+                }
+            )
+        return ous
+
+    def list_users_password_expiring(self, max_days: int) -> list[dict]:
+        conn = self._service_conn()
+        base = self.base_dn
+        search_filter = "(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+        conn.search(
+            base,
+            search_filter,
+            attributes=[
+                "sAMAccountName",
+                "displayName",
+                "mail",
+                "mobile",
+                "msDS-UserPasswordExpiryTimeComputed",
+            ],
+        )
+        items = []
+        now = datetime.now(timezone.utc)
+        for entry in conn.entries:
+            expiry_raw = getattr(entry, "msDS-UserPasswordExpiryTimeComputed", None)
+            expiry_dt = _filetime_to_datetime(expiry_raw.value if expiry_raw else None)
+            if not expiry_dt:
+                continue
+            days_left = (expiry_dt - now).days
+            if days_left < 0 or days_left > max_days:
+                continue
+            items.append(
+                {
+                    "sAMAccountName": getattr(entry, "sAMAccountName", None).value,
+                    "displayName": getattr(entry, "displayName", None).value,
+                    "mail": getattr(entry, "mail", None).value,
+                    "mobile": getattr(entry, "mobile", None).value,
+                    "days_left": days_left,
+                }
+            )
+        return items
+
+    def create_ou(self, name: str, parent_dn: str, description: str = "") -> None:
+        conn = self._service_conn()
+        ou_dn = f"OU={name},{parent_dn}"
+        attrs = {"ou": name, "objectClass": ["top", "organizationalUnit"]}
+        if description:
+            attrs["description"] = description
+        if not conn.add(ou_dn, attributes=attrs):
+            raise ADConnectionError(conn.result.get("message", "add ou failed"))
+
+    def update_ou(self, ou_dn: str, name: Optional[str], description: Optional[str]) -> None:
+        conn = self._service_conn()
+        if name:
+            if not conn.modify_dn(ou_dn, f"OU={name}"):
+                raise ADConnectionError(conn.result.get("message", "rename ou failed"))
+            ou_dn = f"OU={name}," + ou_dn.split(",", 1)[1]
+        if description is not None:
+            if not conn.modify(ou_dn, {"description": [(MODIFY_REPLACE, [description])]}):
+                raise ADConnectionError(conn.result.get("message", "update ou failed"))
+
+    def delete_ou(self, ou_dn: str) -> None:
+        conn = self._service_conn()
+        if not conn.delete(ou_dn):
+            raise ADConnectionError(conn.result.get("message", "delete ou failed"))
+
+    def _set_password(self, conn: Connection, user_dn: str, password: str) -> None:
+        pwd = f'"{password}"'.encode("utf-16-le")
+        if not conn.modify(user_dn, {"unicodePwd": [(MODIFY_REPLACE, [pwd])]}):
+            raise ADConnectionError(conn.result.get("message", "set password failed"))
+
+    def _set_enabled(self, conn: Connection, user_dn: str, enabled: bool) -> None:
+        uac = 512 if enabled else 514
+        if not conn.modify(user_dn, {"userAccountControl": [(MODIFY_REPLACE, [uac])]}):
+            raise ADConnectionError(conn.result.get("message", "set enabled failed"))
+
+    def _domain_from_base_dn(self) -> str:
+        parts = []
+        for part in self.base_dn.split(","):
+            if part.strip().lower().startswith("dc="):
+                parts.append(part.split("=", 1)[1])
+        return ".".join(parts)
+
+
+def _filetime_to_datetime(value) -> Optional[datetime]:
+    if value is None:
+        return None
+    try:
+        if isinstance(value, str):
+            value = int(value)
+        if value <= 0:
+            return None
+        base = datetime(1601, 1, 1, tzinfo=timezone.utc)
+        return base + timedelta(microseconds=value / 10)
+    except Exception:
+        return None

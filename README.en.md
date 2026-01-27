@@ -1,0 +1,105 @@
+# ADMTPRO
+
+AD domain management tool (BS architecture, separated frontend/backend) for self-service users and administrators.
+
+## Features
+
+- User login and self profile view (name/email/mobile)
+- Self password change (old password + SMS code)
+- Forgot password (SMS code)
+- Admin login with OTP
+- User management: CRUD / enable / disable / reset password / move OU
+- OU management: CRUD
+- Audit logs for all DDL operations
+- SMS log & retry (manual/auto)
+- Password expiry reminders (SMS)
+- In-app notifications (expiry records)
+
+## Tech Stack
+
+- Backend: Python 3.12 + Flask
+- Frontend: TypeScript + React + Vite
+- Deployment: Docker Compose
+- Dependencies: LDAP/LDAPS, PostgreSQL, Redis (optional)
+
+## Structure
+
+- `backend/` backend service
+- `frontend/` frontend app
+- `deploy/` nginx config
+- `docker-compose.yml` local stack
+
+## Quick Start
+
+1) Copy env
+
+```
+cp .env.example .env
+```
+
+2) Fill LDAP/SMS/DB configs in `.env`
+
+3) Start
+
+```
+docker compose up --build
+```
+
+4) Access
+
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:8000/api/health`
+
+## Key Env Vars
+
+- LDAP
+  - `LDAP_URL` / `LDAP_BIND_DN` / `LDAP_BIND_PASSWORD` / `LDAP_BASE_DN` / `LDAP_CA_CERT`
+- Admin group
+  - `ADMIN_GROUP_DN`
+- SMS (Aliyun)
+  - `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_KEY_SECRET`
+  - `ALIYUN_SMS_SIGN_NAME`
+  - `ALIYUN_SMS_TEMPLATE_RESET`
+  - `ALIYUN_SMS_TEMPLATE_NOTIFY` (expiry template, param `{days}`)
+- OTP
+  - `OTP_ISSUER` / `OTP_WINDOW`
+- SMS retry
+  - `SMS_AUTO_RETRY` / `SMS_RETRY_INTERVAL`
+- Password expiry reminder
+  - `PASSWORD_EXPIRY_ENABLE`
+  - `PASSWORD_EXPIRY_DAYS` (e.g. `7,3,1`)
+  - `PASSWORD_EXPIRY_CHECK_INTERVAL`
+
+## Notes
+
+- Password expiry uses AD attribute `msDS-UserPasswordExpiryTimeComputed`.
+- Dev mode returns `dev_code` for SMS flows.
+- Ensure SMS templates and signatures are approved in production.
+- User search matches sAMAccountName / displayName / cn / mail / mobile (pinyin only if stored in those fields).
+
+## API Summary
+
+- Auth
+  - `POST /api/auth/login`
+  - `POST /api/auth/otp/setup`
+  - `POST /api/auth/otp/verify`
+- Self service
+  - `GET /api/me`
+  - `POST /api/me/password`
+  - `POST /api/auth/forgot/reset`
+- SMS
+  - `POST /api/auth/sms/send`
+  - `POST /api/sms/retry`
+  - `GET /api/sms/list`
+- Password expiry
+  - `GET /api/password-expiry/list`
+  - `POST /api/password-expiry/trigger`
+- Notifications
+  - `GET /api/notifications`
+- User/OU management
+  - `GET /api/users` / `POST /api/users` / `PUT /api/users/:username`
+  - `PATCH /api/users/:username/status` / `POST /api/users/:username/reset-password`
+  - `DELETE /api/users/:username` / `POST /api/users/:username/move`
+  - `GET /api/ous` / `POST /api/ous` / `PUT /api/ous` / `DELETE /api/ous`
+- Audit
+  - `GET /api/audit`
