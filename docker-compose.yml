@@ -17,8 +17,8 @@ services:
 
   nginx:
     build:
-      context: ./deploy/nginx
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: deploy/nginx/Dockerfile
     depends_on:
       - api
     ports:
