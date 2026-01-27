@@ -2,7 +2,11 @@ import { useState } from "react";
 import { login } from "../services/api";
 import { useToken } from "../store";
 
-export default function LoginPage() {
+type Props = {
+  onForgot?: () => void;
+};
+
+export default function LoginPage({ onForgot }: Props) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -47,6 +51,9 @@ export default function LoginPage() {
         <div className="actions">
           <button className="button" type="submit">
             登录
+          </button>
+          <button className="button secondary" type="button" onClick={onForgot}>
+            忘记密码
           </button>
         </div>
       </form>

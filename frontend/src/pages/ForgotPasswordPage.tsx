@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { emailReset, forgotReset, sendEmailCode, sendSmsCode } from "../services/api";
 
-export default function ForgotPasswordPage() {
+type Props = {
+  onBack?: () => void;
+};
+
+export default function ForgotPasswordPage({ onBack }: Props) {
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -49,6 +53,9 @@ export default function ForgotPasswordPage() {
     <div className="panel">
       <h2>忘记密码</h2>
       <div className="actions">
+        <button className="button secondary" type="button" onClick={onBack}>
+          返回登录
+        </button>
         <label className="badge">
           <input
             type="radio"

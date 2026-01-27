@@ -60,51 +60,53 @@ export default function App() {
         </div>
       </div>
 
-      <div className="nav">
-        <button className={page === "login" ? "active" : ""} onClick={() => setPage("login")}>
-          普通用户登录
-        </button>
-        <button className={page === "admin" ? "active" : ""} onClick={() => setPage("admin")}>
-          管理员登录
-        </button>
-        <button className={page === "forgot" ? "active" : ""} onClick={() => setPage("forgot")}>
-          忘记密码
-        </button>
-        <button className={page === "me" ? "active" : ""} onClick={() => setPage("me")}>
-          个人中心
-        </button>
-        <button
-          className={page === "admin-console" ? "active" : ""}
-          onClick={() => setPage("admin-console")}
-        >
-          管理台
-        </button>
-        <button className={page === "audit" ? "active" : ""} onClick={() => setPage("audit")}>
-          审计日志
-        </button>
-        <button className={page === "sms" ? "active" : ""} onClick={() => setPage("sms")}>
-          短信日志
-        </button>
-        <button className={page === "expiry" ? "active" : ""} onClick={() => setPage("expiry")}>
-          到期提醒
-        </button>
-        <button
-          className={page === "notifications" ? "active" : ""}
-          onClick={() => setPage("notifications")}
-        >
-          站内通知
-        </button>
-        <button className={page === "config" ? "active" : ""} onClick={() => setPage("config")}>
-          配置中心
-        </button>
-        <button className={page === "health" ? "active" : ""} onClick={() => setPage("health")}>
-          健康检查
-        </button>
-      </div>
+      {page !== "login" && page !== "forgot" && (
+        <div className="nav">
+          <button className={page === "login" ? "active" : ""} onClick={() => setPage("login")}>
+            普通用户登录
+          </button>
+          <button className={page === "admin" ? "active" : ""} onClick={() => setPage("admin")}>
+            管理员登录
+          </button>
+          <button className={page === "forgot" ? "active" : ""} onClick={() => setPage("forgot")}>
+            忘记密码
+          </button>
+          <button className={page === "me" ? "active" : ""} onClick={() => setPage("me")}>
+            个人中心
+          </button>
+          <button
+            className={page === "admin-console" ? "active" : ""}
+            onClick={() => setPage("admin-console")}
+          >
+            管理台
+          </button>
+          <button className={page === "audit" ? "active" : ""} onClick={() => setPage("audit")}>
+            审计日志
+          </button>
+          <button className={page === "sms" ? "active" : ""} onClick={() => setPage("sms")}>
+            短信日志
+          </button>
+          <button className={page === "expiry" ? "active" : ""} onClick={() => setPage("expiry")}>
+            到期提醒
+          </button>
+          <button
+            className={page === "notifications" ? "active" : ""}
+            onClick={() => setPage("notifications")}
+          >
+            站内通知
+          </button>
+          <button className={page === "config" ? "active" : ""} onClick={() => setPage("config")}>
+            配置中心
+          </button>
+          <button className={page === "health" ? "active" : ""} onClick={() => setPage("health")}>
+            健康检查
+          </button>
+        </div>
+      )}
 
-      {page === "login" && <LoginPage />}
+      {page === "login" && <LoginPage onForgot={() => setPage("forgot")} />}
       {page === "admin" && <AdminLoginPage />}
-      {page === "forgot" && <ForgotPasswordPage />}
+      {page === "forgot" && <ForgotPasswordPage onBack={() => setPage("login")} />}
       {page === "me" && <MePage />}
       {page === "admin-console" && <AdminConsolePage />}
       {page === "audit" && <AuditLogPage />}
