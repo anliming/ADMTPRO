@@ -8,8 +8,11 @@
 - OU 管理
 - 密码管理（改密/忘记密码/重置）
 - 短信服务
+- 邮件服务（可选）
 - 审计日志
+- 审计导出与详情
 - 配置中心
+- 配置历史与回滚
 - 健康检查
 - 通知与到期提醒
 
@@ -38,8 +41,9 @@
 - 普通用户登录 → AD 认证 → 会话
 - 管理员登录 → OTP → 会话
 - 自助改密 → 短信验证 → AD 改密 → 审计
-- 忘记密码 → 短信验证 → AD 改密 → 审计
+- 忘记密码 → 短信/邮件验证 → AD 改密 → 审计
 - 管理员重置密码 → AD 重置 → 审计
+- 批量导入/导出/批量操作 → AD 更新 → 审计
 - 用户/OU CRUD → AD 更新 → 审计
 - 到期提醒任务 → 查询即将到期 → 通知 → 审计
 
@@ -59,6 +63,10 @@
   - userId, secret, enabled, lastVerifiedAt
 - SmsCode
   - userId, phone, code, expiresAt, status
+- EmailCode
+  - userId, email, code, expiresAt, status
+- ConfigHistory
+  - key, value, createdAt
 
 ---
 
@@ -71,7 +79,9 @@
 - 用户自助
   - GET /api/me
   - POST /api/me/password
-  - POST /api/me/forgot-password
+  - POST /api/auth/forgot/reset
+  - POST /api/auth/email/send
+  - POST /api/auth/email/reset
 - 用户管理
   - GET /api/users
   - POST /api/users
@@ -79,6 +89,9 @@
   - PATCH /api/users/:id/status
   - POST /api/users/:id/reset-password
   - DELETE /api/users/:id
+  - GET /api/users/export
+  - POST /api/users/import
+  - POST /api/users/batch
 - OU 管理
   - GET /api/ous
   - POST /api/ous
@@ -87,12 +100,15 @@
   - POST /api/ous/:id/move-user
 - 审计
   - GET /api/audit
-  - GET /api/audit/:id
-  - POST /api/audit/export
+  - GET /api/audit/export
 - 配置与健康
   - GET /api/config
   - PUT /api/config
   - GET /api/health
+  - GET /api/config/history
+  - POST /api/config/rollback
+  - GET /api/health/details
+  - GET /api/notifications
 
 ---
 
@@ -149,6 +165,7 @@
 - OU_CREATE, OU_UPDATE, OU_DELETE
 - OTP_BIND, OTP_UNBIND
 - SMS_SEND, SMS_VERIFY
+- EMAIL_SEND, EMAIL_VERIFY
 - PASSWORD_EXPIRY_NOTIFY
 
 ---
