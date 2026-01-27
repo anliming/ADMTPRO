@@ -95,7 +95,7 @@ class LDAPClient:
         if query:
             q = query.replace("*", "")
             filter_parts.append(
-                f\"(|(sAMAccountName=*{q}*)(displayName=*{q}*)(cn=*{q}*)(mail=*{q}*)(mobile=*{q}*))\"
+                f"(|(sAMAccountName=*{q}*)(displayName=*{q}*)(cn=*{q}*)(mail=*{q}*)(mobile=*{q}*))"
             )
         if enabled is True:
             filter_parts.append("(!(userAccountControl:1.2.840.113556.1.4.803:=2))")
