@@ -23,6 +23,9 @@ export async function login(
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    if (data.locked_until) {
+      throw new Error(`${data.message}（解锁时间：${data.locked_until}）`);
+    }
     throw new Error(data.message || "login failed");
   }
   return res.json();

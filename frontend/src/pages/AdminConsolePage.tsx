@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listUsers,
   createUser,
@@ -13,6 +13,8 @@ import {
   deleteOu
 } from "../services/api";
 import { useToken } from "../store";
+import { useToast } from "../ui/Toast";
+import Modal from "../ui/Modal";
 
 type Tab = "users" | "ous";
 
@@ -35,6 +37,7 @@ type Ou = {
 export default function AdminConsolePage() {
   const [tab, setTab] = useState<Tab>("users");
   const { token, setToken } = useToken();
+  const toast = useToast();
   const [message, setMessage] = useState("");
 
   const [users, setUsers] = useState<User[]>([]);
@@ -56,6 +59,25 @@ export default function AdminConsolePage() {
   });
 
   const [newOu, setNewOu] = useState({ name: "", parentDn: "", description: "" });
+  const [selectedOu, setSelectedOu] = useState<Ou | null>(null);
+  const [ouEditOpen, setOuEditOpen] = useState(false);
+  const [ouDeleteOpen, setOuDeleteOpen] = useState(false);
+  const [ouForm, setOuForm] = useState({ name: "", description: "" });
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [disableOpen, setDisableOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    displayName: "",
+    mail: "",
+    mobile: "",
+    department: "",
+    title: ""
+  });
+  const [resetPassword, setResetPassword] = useState("");
+  const [moveTargetOu, setMoveTargetOu] = useState("");
 
   useEffect(() => {
     setMessage("");
@@ -91,19 +113,20 @@ export default function AdminConsolePage() {
       return;
     }
     await createUser(token, newUser);
-    setMessage("用户创建成功");
+    toast.push("用户创建成功", "success");
     await loadUsers();
   }
 
-  async function handleUpdateUser(username: string) {
-    if (!token.trim()) {
-      setMessage("请输入管理员 Token");
-      return;
-    }
-    const mail = prompt("邮箱", "") || "";
-    await updateUser(token, username, { mail });
-    setMessage("用户更新成功");
-    await loadUsers();
+  function openEdit(user: User) {
+    setSelectedUser(user);
+    setEditForm({
+      displayName: user.displayName || "",
+      mail: user.mail || "",
+      mobile: user.mobile || "",
+      department: user.department || "",
+      title: user.title || ""
+    });
+    setEditOpen(true);
   }
 
   async function handleToggleUser(username: string, enabled: boolean) {
@@ -111,42 +134,74 @@ export default function AdminConsolePage() {
       setMessage("请输入管理员 Token");
       return;
     }
-    await setUserStatus(token, username, enabled);
-    setMessage("用户状态已更新");
+    const user = users.find((u) => u.sAMAccountName === username) || null;
+    setSelectedUser(user);
+    if (enabled) {
+      await setUserStatus(token, username, true);
+      toast.push("用户已启用", "success");
+      await loadUsers();
+      return;
+    }
+    setDisableOpen(true);
+  }
+
+  function openReset(user: User) {
+    setSelectedUser(user);
+    setResetPassword("");
+    setResetOpen(true);
+  }
+
+  async function handleResetPassword() {
+    if (!token.trim()) {
+      setMessage("请输入管理员 Token");
+      return;
+    }
+    if (!selectedUser) return;
+    if (!resetPassword) {
+      setMessage("请输入新密码");
+      return;
+    }
+    await resetUserPassword(token, selectedUser.sAMAccountName, resetPassword);
+    toast.push("密码已重置", "success");
+    setResetOpen(false);
+  }
+
+  function openDelete(user: User) {
+    setSelectedUser(user);
+    setDeleteOpen(true);
+  }
+
+  async function handleDeleteUser() {
+    if (!token.trim()) {
+      setMessage("请输入管理员 Token");
+      return;
+    }
+    if (!selectedUser) return;
+    await deleteUser(token, selectedUser.sAMAccountName);
+    toast.push("用户已删除", "success");
+    setDeleteOpen(false);
     await loadUsers();
   }
 
-  async function handleResetPassword(username: string) {
-    if (!token.trim()) {
-      setMessage("请输入管理员 Token");
-      return;
-    }
-    const newPassword = prompt("新密码", "") || "";
-    if (!newPassword) return;
-    await resetUserPassword(token, username, newPassword);
-    setMessage("密码已重置");
+  function openMove(user: User) {
+    setSelectedUser(user);
+    setMoveTargetOu("");
+    setMoveOpen(true);
   }
 
-  async function handleDeleteUser(username: string) {
+  async function handleMoveUser() {
     if (!token.trim()) {
       setMessage("请输入管理员 Token");
       return;
     }
-    if (!confirm(`确认删除用户 ${username}？`)) return;
-    await deleteUser(token, username);
-    setMessage("用户已删除");
-    await loadUsers();
-  }
-
-  async function handleMoveUser(username: string) {
-    if (!token.trim()) {
-      setMessage("请输入管理员 Token");
+    if (!selectedUser) return;
+    if (!moveTargetOu) {
+      setMessage("请选择目标 OU");
       return;
     }
-    const targetOuDn = prompt("目标 OU DN", "") || "";
-    if (!targetOuDn) return;
-    await moveUser(token, username, targetOuDn);
-    setMessage("用户已移动");
+    await moveUser(token, selectedUser.sAMAccountName, moveTargetOu);
+    toast.push("用户已移动", "success");
+    setMoveOpen(false);
     await loadUsers();
   }
 
@@ -160,32 +215,53 @@ export default function AdminConsolePage() {
       return;
     }
     await createOu(token, newOu);
-    setMessage("OU 创建成功");
+    toast.push("OU 创建成功", "success");
     await loadOus();
   }
 
-  async function handleUpdateOu(ou: Ou) {
+  function openOuEdit(ou: Ou) {
+    setSelectedOu(ou);
+    setOuForm({ name: "", description: ou.description || "" });
+    setOuEditOpen(true);
+  }
+
+  async function handleUpdateOu() {
     if (!token.trim()) {
       setMessage("请输入管理员 Token");
       return;
     }
-    const name = prompt("新名称(可选)", "") || "";
-    const description = prompt("描述(可选)", ou.description || "") || "";
-    await updateOu(token, { dn: ou.dn, name: name || undefined, description });
-    setMessage("OU 已更新");
+    if (!selectedOu) return;
+    await updateOu(token, { dn: selectedOu.dn, name: ouForm.name || undefined, description: ouForm.description });
+    toast.push("OU 已更新", "success");
+    setOuEditOpen(false);
     await loadOus();
   }
 
-  async function handleDeleteOu(ou: Ou) {
+  function openOuDelete(ou: Ou) {
+    setSelectedOu(ou);
+    setOuDeleteOpen(true);
+  }
+
+  async function handleDeleteOu() {
     if (!token.trim()) {
       setMessage("请输入管理员 Token");
       return;
     }
-    if (!confirm(`确认删除 OU ${ou.dn}？`)) return;
-    await deleteOu(token, ou.dn);
-    setMessage("OU 已删除");
+    if (!selectedOu) return;
+    await deleteOu(token, selectedOu.dn);
+    toast.push("OU 已删除", "success");
+    setOuDeleteOpen(false);
     await loadOus();
   }
+
+  const ouOptions = useMemo(() => {
+    const items = [...ous];
+    items.sort((a, b) => (a.dn || "").localeCompare(b.dn || ""));
+    return items.map((o) => {
+      const depth = (o.dn.match(/OU=/g) || []).length;
+      return { dn: o.dn, label: `${"— ".repeat(depth)}${o.dn}` };
+    });
+  }, [ous]);
 
   return (
     <div className="panel">
@@ -219,7 +295,9 @@ export default function AdminConsolePage() {
               查询
             </button>
           </div>
-          <table className="table">
+          <div className="split">
+            <div>
+              <table className="table">
             <thead>
               <tr>
                 <th>账号</th>
@@ -232,7 +310,7 @@ export default function AdminConsolePage() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.dn}>
+                <tr key={u.dn} onClick={() => setSelectedUser(u)}>
                   <td>{u.sAMAccountName}</td>
                   <td>{u.displayName}</td>
                   <td>{u.mail}</td>
@@ -240,7 +318,7 @@ export default function AdminConsolePage() {
                   <td>{u.title}</td>
                   <td>
                     <div className="actions">
-                      <button className="button secondary" onClick={() => handleUpdateUser(u.sAMAccountName)}>
+                      <button className="button secondary" onClick={() => openEdit(u)}>
                         编辑
                       </button>
                       <button className="button secondary" onClick={() => handleToggleUser(u.sAMAccountName, true)}>
@@ -249,13 +327,13 @@ export default function AdminConsolePage() {
                       <button className="button secondary" onClick={() => handleToggleUser(u.sAMAccountName, false)}>
                         禁用
                       </button>
-                      <button className="button secondary" onClick={() => handleResetPassword(u.sAMAccountName)}>
+                      <button className="button secondary" onClick={() => openReset(u)}>
                         重置密码
                       </button>
-                      <button className="button secondary" onClick={() => handleMoveUser(u.sAMAccountName)}>
+                      <button className="button secondary" onClick={() => openMove(u)}>
                         移动 OU
                       </button>
-                      <button className="button secondary" onClick={() => handleDeleteUser(u.sAMAccountName)}>
+                      <button className="button secondary" onClick={() => openDelete(u)}>
                         删除
                       </button>
                     </div>
@@ -263,7 +341,38 @@ export default function AdminConsolePage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+              </table>
+            </div>
+            <div className="side-panel">
+              <h3>用户详情</h3>
+              {selectedUser ? (
+                <div className="form">
+                  <div className="form-row">
+                    <span className="label">账号</span>
+                    <div>{selectedUser.sAMAccountName}</div>
+                  </div>
+                  <div className="form-row">
+                    <span className="label">姓名</span>
+                    <div>{selectedUser.displayName}</div>
+                  </div>
+                  <div className="form-row">
+                    <span className="label">邮箱</span>
+                    <div>{selectedUser.mail}</div>
+                  </div>
+                  <div className="form-row">
+                    <span className="label">部门</span>
+                    <div>{selectedUser.department}</div>
+                  </div>
+                  <div className="form-row">
+                    <span className="label">岗位</span>
+                    <div>{selectedUser.title}</div>
+                  </div>
+                </div>
+              ) : (
+                <p className="notice">请选择一个用户</p>
+              )}
+            </div>
+          </div>
 
           <h3>创建用户</h3>
           <div className="actions">
@@ -308,12 +417,13 @@ export default function AdminConsolePage() {
           <ul>
             {ous.map((ou) => (
               <li key={ou.dn}>
-                {ou.dn} {ou.description ? `(${ou.description})` : ""}
+                {`${"— ".repeat((ou.dn.match(/OU=/g) || []).length)}${ou.dn}`}{" "}
+                {ou.description ? `(${ou.description})` : ""}
                 <div className="actions">
-                  <button className="button secondary" onClick={() => handleUpdateOu(ou)}>
+                  <button className="button secondary" onClick={() => openOuEdit(ou)}>
                     编辑
                   </button>
-                  <button className="button secondary" onClick={() => handleDeleteOu(ou)}>
+                  <button className="button secondary" onClick={() => openOuDelete(ou)}>
                     删除
                   </button>
                 </div>
@@ -349,6 +459,159 @@ export default function AdminConsolePage() {
       )}
 
       {message && <p className="notice">{message}</p>}
+
+      <Modal title="编辑用户" open={editOpen} onClose={() => setEditOpen(false)}>
+        <div className="form-row">
+          <span className="label">姓名</span>
+          <input
+            className="input"
+            value={editForm.displayName}
+            onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })}
+          />
+        </div>
+        <div className="form-row">
+          <span className="label">邮箱</span>
+          <input
+            className="input"
+            value={editForm.mail}
+            onChange={(e) => setEditForm({ ...editForm, mail: e.target.value })}
+          />
+        </div>
+        <div className="form-row">
+          <span className="label">手机号</span>
+          <input
+            className="input"
+            value={editForm.mobile}
+            onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
+          />
+        </div>
+        <div className="form-row">
+          <span className="label">部门</span>
+          <input
+            className="input"
+            value={editForm.department}
+            onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+          />
+        </div>
+        <div className="form-row">
+          <span className="label">岗位</span>
+          <input
+            className="input"
+            value={editForm.title}
+            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+          />
+        </div>
+        <div className="actions">
+          <button
+            className="button"
+            onClick={async () => {
+              if (!selectedUser) return;
+              await updateUser(token, selectedUser.sAMAccountName, editForm);
+              toast.push("用户已更新", "success");
+              setEditOpen(false);
+              await loadUsers();
+            }}
+          >
+            保存
+          </button>
+        </div>
+      </Modal>
+
+      <Modal title="重置密码" open={resetOpen} onClose={() => setResetOpen(false)}>
+        <div className="form-row">
+          <span className="label">新密码</span>
+          <input
+            className="input"
+            type="password"
+            value={resetPassword}
+            onChange={(e) => setResetPassword(e.target.value)}
+          />
+        </div>
+        <div className="actions">
+          <button className="button" onClick={handleResetPassword}>
+            确认重置
+          </button>
+        </div>
+      </Modal>
+
+      <Modal title="移动 OU" open={moveOpen} onClose={() => setMoveOpen(false)}>
+        <div className="form-row">
+          <span className="label">目标 OU</span>
+          <select className="input" value={moveTargetOu} onChange={(e) => setMoveTargetOu(e.target.value)}>
+            <option value="">请选择</option>
+            {ouOptions.map((o) => (
+              <option key={o.dn} value={o.dn}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="actions">
+          <button className="button" onClick={handleMoveUser}>
+            确认移动
+          </button>
+        </div>
+      </Modal>
+
+      <Modal title="删除用户" open={deleteOpen} onClose={() => setDeleteOpen(false)}>
+        <p>确认删除用户 {selectedUser?.sAMAccountName}？</p>
+        <div className="actions">
+          <button className="button" onClick={handleDeleteUser}>
+            确认删除
+          </button>
+        </div>
+      </Modal>
+
+      <Modal title="禁用用户" open={disableOpen} onClose={() => setDisableOpen(false)}>
+        <p>确认禁用用户 {selectedUser?.sAMAccountName}？</p>
+        <div className="actions">
+          <button
+            className="button"
+            onClick={async () => {
+              if (!selectedUser) return;
+              await setUserStatus(token, selectedUser.sAMAccountName, false);
+              toast.push("用户已禁用", "success");
+              setDisableOpen(false);
+              await loadUsers();
+            }}
+          >
+            确认禁用
+          </button>
+        </div>
+      </Modal>
+
+      <Modal title="编辑 OU" open={ouEditOpen} onClose={() => setOuEditOpen(false)}>
+        <div className="form-row">
+          <span className="label">新名称（可选）</span>
+          <input
+            className="input"
+            value={ouForm.name}
+            onChange={(e) => setOuForm({ ...ouForm, name: e.target.value })}
+          />
+        </div>
+        <div className="form-row">
+          <span className="label">描述</span>
+          <input
+            className="input"
+            value={ouForm.description}
+            onChange={(e) => setOuForm({ ...ouForm, description: e.target.value })}
+          />
+        </div>
+        <div className="actions">
+          <button className="button" onClick={handleUpdateOu}>
+            保存
+          </button>
+        </div>
+      </Modal>
+
+      <Modal title="删除 OU" open={ouDeleteOpen} onClose={() => setOuDeleteOpen(false)}>
+        <p>确认删除 OU {selectedOu?.dn}？</p>
+        <div className="actions">
+          <button className="button" onClick={handleDeleteOu}>
+            确认删除
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

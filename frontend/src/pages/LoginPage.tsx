@@ -22,7 +22,8 @@ export default function LoginPage() {
       }
       setMessage(`登录成功：${JSON.stringify(data.user)}`);
     } catch (err) {
-      setMessage((err as Error).message);
+      const message = (err as Error).message;
+      setMessage(message);
     }
   }
 

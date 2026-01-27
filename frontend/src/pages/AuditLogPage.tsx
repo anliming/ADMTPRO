@@ -51,6 +51,22 @@ export default function AuditLogPage() {
         <button className="button" onClick={handleLoad}>
           查询
         </button>
+        <button
+          className="button secondary"
+          onClick={() => {
+            if (!token.trim()) {
+              setMessage("请输入管理员 Token");
+              return;
+            }
+            const qs = new URLSearchParams();
+            if (actor) qs.set("actor", actor);
+            if (action) qs.set("action", action);
+            if (target) qs.set("target", target);
+            window.open(`/api/audit/export?${qs.toString()}`, "_blank");
+          }}
+        >
+          导出 CSV
+        </button>
       </div>
       <table className="table">
         <thead>

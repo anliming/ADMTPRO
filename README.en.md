@@ -78,6 +78,7 @@ docker compose up --build
 - Ensure SMS templates and signatures are approved in production.
 - User search matches sAMAccountName / displayName / cn / mail / mobile (pinyin only if stored in those fields).
 - Login failures trigger account lock based on configured thresholds.
+- Audit logs support CSV export.
 
 ## API Summary
 

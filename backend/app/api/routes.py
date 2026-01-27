@@ -4,6 +4,7 @@ from ..adapters.ldap_client import LDAPClient
 from ..core.auth import issue_token, verify_token
 from ..services.otp_service import create_secret, enable_secret, get_secret, verify_code
 from ..services.audit_service import list_logs, write_log
+from ..services.audit_export import export_csv
 from ..services.sms_service import (
     can_send,
     create_code,
@@ -85,7 +86,16 @@ def login():
         return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
     locked_until = is_locked(current_app.config["DB_URL"], username)
     if locked_until:
-        return jsonify({"code": "RATE_LIMITED", "message": "账号已锁定，请稍后再试"}), 429
+        return (
+            jsonify(
+                {
+                    "code": "RATE_LIMITED",
+                    "message": "账号已锁定，请稍后再试",
+                    "locked_until": locked_until.isoformat(),
+                }
+            ),
+            429,
+        )
 
     ldap_client = _ldap_client()
     if not ldap_client.authenticate_user(username, password):
@@ -331,8 +341,12 @@ def forgot_reset():
     try:
         ldap_client.reset_password(user_dn, new_password)
     except ADConnectionError as exc:
-        _audit({"username": username, "role": "user"}, "PASSWORD_RESET_FORGOT", username, "error", str(exc))
-        return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
+        message = str(exc)
+        code = "AD_ERROR"
+        if "password" in message.lower():
+            code = "AD_POLICY_VIOLATION"
+        _audit({"username": username, "role": "user"}, "PASSWORD_RESET_FORGOT", username, "error", message)
+        return jsonify({"code": code, "message": "密码策略不符合要求"}), 400
     _audit({"username": username, "role": "user"}, "PASSWORD_RESET_FORGOT", username, "ok")
     return jsonify({"status": "ok"})
 
@@ -406,8 +420,12 @@ def create_user():
             attributes=attrs,
         )
     except ADConnectionError as exc:
-        _audit(actor, "USER_CREATE", payload.get("sAMAccountName", ""), "error", str(exc))
-        return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
+        message = str(exc)
+        code = "AD_ERROR"
+        if "password" in message.lower():
+            code = "AD_POLICY_VIOLATION"
+        _audit(actor, "USER_CREATE", payload.get("sAMAccountName", ""), "error", message)
+        return jsonify({"code": code, "message": "密码策略不符合要求"}), 400
     _audit(actor, "USER_CREATE", payload.get("sAMAccountName", ""), "ok")
     return jsonify({"status": "ok"})
 
@@ -604,6 +622,20 @@ def audit_logs():
     limit = int(request.args.get("limit", "100"))
     items = list_logs(current_app.config["DB_URL"], actor=actor, action=action, target=target, limit=limit)
     return jsonify({"items": items})
+
+
+@api_bp.get("/audit/export")
+def audit_export():
+    if not _require_session("admin"):
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    actor = request.args.get("actor", "").strip()
+    action = request.args.get("action", "").strip()
+    target = request.args.get("target", "").strip()
+    limit = int(request.args.get("limit", "1000"))
+    csv_text = export_csv(current_app.config["DB_URL"], actor=actor, action=action, target=target, limit=limit)
+    resp = current_app.response_class(csv_text, mimetype="text/csv")
+    resp.headers["Content-Disposition"] = "attachment; filename=audit.csv"
+    return resp
 
 
 @api_bp.get("/notifications")
