@@ -122,11 +122,16 @@ export async function setUserStatus(token: string, username: string, enabled: bo
   return res.json();
 }
 
-export async function resetUserPassword(token: string, username: string, newPassword: string) {
+export async function resetUserPassword(
+  token: string,
+  username: string,
+  newPassword: string,
+  forceChangeAtFirstLogin?: boolean
+) {
   const res = await fetch(`/api/users/${encodeURIComponent(username)}/reset-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ newPassword })
+    body: JSON.stringify({ newPassword, forceChangeAtFirstLogin })
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -156,6 +161,50 @@ export async function moveUser(token: string, username: string, targetOuDn: stri
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "move user failed");
+  }
+  return res.json();
+}
+
+export async function exportUsers(token: string, params?: { q?: string; ou?: string; status?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set("q", params.q);
+  if (params?.ou) qs.set("ou", params.ou);
+  if (params?.status) qs.set("status", params.status);
+  const res = await fetch(`/api/users/export?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "export users failed");
+  }
+  return res.text();
+}
+
+export async function importUsers(token: string, csv: string) {
+  const res = await fetch("/api/users/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ csv })
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "import users failed");
+  }
+  return res.json();
+}
+
+export async function batchUsers(
+  token: string,
+  payload: { action: "enable" | "disable" | "move"; usernames: string[]; targetOuDn?: string }
+) {
+  const res = await fetch("/api/users/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "batch users failed");
   }
   return res.json();
 }
@@ -212,12 +261,13 @@ export async function deleteOu(token: string, dn: string) {
 
 export async function listAudit(
   token: string,
-  params?: { actor?: string; action?: string; target?: string; limit?: number }
+  params?: { actor?: string; action?: string; target?: string; result?: string; limit?: number }
 ) {
   const qs = new URLSearchParams();
   if (params?.actor) qs.set("actor", params.actor);
   if (params?.action) qs.set("action", params.action);
   if (params?.target) qs.set("target", params.target);
+  if (params?.result) qs.set("result", params.result);
   if (params?.limit) qs.set("limit", String(params.limit));
   const res = await fetch(`/api/audit?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -251,6 +301,32 @@ export async function forgotReset(username: string, code: string, newPassword: s
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "forgot reset failed");
+  }
+  return res.json();
+}
+
+export async function sendEmailCode(username: string) {
+  const res = await fetch("/api/auth/email/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, scene: "forgot" })
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "send email failed");
+  }
+  return res.json();
+}
+
+export async function emailReset(username: string, code: string, newPassword: string) {
+  const res = await fetch("/api/auth/email/reset", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, code, newPassword })
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || "email reset failed");
   }
   return res.json();
 }
@@ -334,5 +410,29 @@ export async function listNotifications(token: string) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || "list notifications failed");
   }
+  return res.json();
+}
+
+export async function getHealthDetails() {
+  const res = await fetch("/api/health/details");
+  if (!res.ok) throw new Error("health details failed");
+  return res.json();
+}
+
+export async function listConfigHistory(token: string, limit = 50) {
+  const res = await fetch(`/api/config/history?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error("config history failed");
+  return res.json();
+}
+
+export async function rollbackConfig(token: string, id: number) {
+  const res = await fetch("/api/config/rollback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ id })
+  });
+  if (!res.ok) throw new Error("config rollback failed");
   return res.json();
 }

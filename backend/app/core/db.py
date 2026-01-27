@@ -42,10 +42,14 @@ def init_db(db_url: str) -> None:
               ip TEXT NOT NULL,
               ua TEXT NOT NULL,
               detail TEXT,
+              before_json JSONB,
+              after_json JSONB,
               created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             """
         )
+        conn.execute("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS before_json JSONB")
+        conn.execute("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS after_json JSONB")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS sms_codes (
@@ -81,6 +85,20 @@ def init_db(db_url: str) -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS email_codes (
+              id BIGSERIAL PRIMARY KEY,
+              username TEXT NOT NULL,
+              email TEXT NOT NULL,
+              scene TEXT NOT NULL,
+              code TEXT NOT NULL,
+              sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              expires_at TIMESTAMPTZ NOT NULL,
+              used_at TIMESTAMPTZ
+            );
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS login_attempts (
               username TEXT PRIMARY KEY,
               fail_count INT NOT NULL DEFAULT 0,
@@ -94,6 +112,16 @@ def init_db(db_url: str) -> None:
               key TEXT PRIMARY KEY,
               value_json JSONB NOT NULL,
               updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS system_config_history (
+              id BIGSERIAL PRIMARY KEY,
+              key TEXT NOT NULL,
+              value_json JSONB NOT NULL,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             """
         )

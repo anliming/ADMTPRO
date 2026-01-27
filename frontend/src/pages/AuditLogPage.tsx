@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { listAudit } from "../services/api";
 import { useToken } from "../store";
+import Modal from "../ui/Modal";
 
 type AuditItem = {
   id: number;
@@ -12,6 +13,8 @@ type AuditItem = {
   ip: string;
   ua: string;
   detail?: string;
+  before?: unknown;
+  after?: unknown;
   created_at: string;
 };
 
@@ -21,6 +24,9 @@ export default function AuditLogPage() {
   const [action, setAction] = useState("");
   const [target, setTarget] = useState("");
   const [items, setItems] = useState<AuditItem[]>([]);
+  const [result, setResult] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selected, setSelected] = useState<AuditItem | null>(null);
   const [message, setMessage] = useState("");
 
   async function handleLoad() {
@@ -30,7 +36,7 @@ export default function AuditLogPage() {
       return;
     }
     try {
-      const data = await listAudit(token, { actor, action, target, limit: 100 });
+      const data = await listAudit(token, { actor, action, target, result, limit: 100 });
       setItems(data.items || []);
     } catch (err) {
       setMessage((err as Error).message);
@@ -48,6 +54,7 @@ export default function AuditLogPage() {
         <input className="input" placeholder="actor" value={actor} onChange={(e) => setActor(e.target.value)} />
         <input className="input" placeholder="action" value={action} onChange={(e) => setAction(e.target.value)} />
         <input className="input" placeholder="target" value={target} onChange={(e) => setTarget(e.target.value)} />
+        <input className="input" placeholder="result(ok/error)" value={result} onChange={(e) => setResult(e.target.value)} />
         <button className="button" onClick={handleLoad}>
           查询
         </button>
@@ -62,6 +69,7 @@ export default function AuditLogPage() {
             if (actor) qs.set("actor", actor);
             if (action) qs.set("action", action);
             if (target) qs.set("target", target);
+            if (result) qs.set("result", result);
             window.open(`/api/audit/export?${qs.toString()}`, "_blank");
           }}
         >
@@ -78,6 +86,7 @@ export default function AuditLogPage() {
             <th>动作</th>
             <th>目标</th>
             <th>结果</th>
+            <th>详情</th>
           </tr>
         </thead>
         <tbody>
@@ -90,11 +99,26 @@ export default function AuditLogPage() {
               <td>{it.action}</td>
               <td>{it.target}</td>
               <td>{it.result}</td>
+              <td>
+                <button
+                  className="button secondary"
+                  onClick={() => {
+                    setSelected(it);
+                    setDetailOpen(true);
+                  }}
+                >
+                  查看
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
       {message && <p className="notice">{message}</p>}
+
+      <Modal title="审计详情" open={detailOpen} onClose={() => setDetailOpen(false)}>
+        <pre>{JSON.stringify(selected, null, 2)}</pre>
+      </Modal>
     </div>
   );
 }

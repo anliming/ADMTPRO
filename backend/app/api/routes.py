@@ -18,7 +18,9 @@ from ..services.sms_service import (
 from ..services.password_expiry import trigger_password_expiry_check
 from ..services.notify_service import list_expiry_notifies
 from ..services.auth_service import clear_fail, is_locked, record_fail
-from ..services.config_service import get_config, set_config
+from ..services.config_service import get_config, set_config, list_history, rollback
+from ..services.email_service import create_code as create_email_code, verify_code as verify_email_code, send_email
+from ..services.health_service import check_db, check_ldap
 from ..core.config import apply_overrides
 from ..services.sms_retry import start_sms_retry_loop
 from ..services.password_expiry import start_password_expiry_loop
@@ -57,7 +59,15 @@ def _require_session(required_role: str | None = None) -> dict | None:
     return data
 
 
-def _audit(actor_info: dict, action: str, target: str, result: str, detail: str | None = None) -> None:
+def _audit(
+    actor_info: dict,
+    action: str,
+    target: str,
+    result: str,
+    detail: str | None = None,
+    before: dict | None = None,
+    after: dict | None = None,
+) -> None:
     write_log(
         current_app.config["DB_URL"],
         actor=actor_info.get("username", ""),
@@ -68,12 +78,21 @@ def _audit(actor_info: dict, action: str, target: str, result: str, detail: str 
         ip=request.remote_addr or "",
         ua=request.headers.get("User-Agent", ""),
         detail=detail,
+        before=before,
+        after=after,
     )
 
 
 @api_bp.get("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@api_bp.get("/health/details")
+def health_details():
+    db_ok = check_db(current_app.config["DB_URL"])
+    ldap_ok = check_ldap(_ldap_client())
+    return jsonify({"api": True, "db": db_ok, "ldap": ldap_ok})
 
 
 @api_bp.post("/auth/login")
@@ -351,6 +370,81 @@ def forgot_reset():
     return jsonify({"status": "ok"})
 
 
+@api_bp.post("/auth/email/send")
+def send_email_code():
+    payload = request.get_json(silent=True) or {}
+    username = payload.get("username", "").strip()
+    scene = payload.get("scene", "").strip()
+    if not username or scene not in {"forgot"}:
+        return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+    ldap_client = _ldap_client()
+    info = ldap_client.get_user_info(username)
+    email = (info or {}).get("mail") or ""
+    if not email:
+        return jsonify({"code": "OBJECT_NOT_FOUND", "message": "邮箱不存在"}), 404
+    code = create_email_code(
+        current_app.config["DB_URL"],
+        username,
+        email,
+        scene,
+        current_app.config["SMS_CODE_TTL"],
+    )
+    if current_app.config["APP_ENV"] != "development":
+        if not all(
+            [
+                current_app.config["SMTP_HOST"],
+                current_app.config["SMTP_FROM"],
+            ]
+        ):
+            return jsonify({"code": "CONFIG_ERROR", "message": "邮件配置不完整"}), 500
+        try:
+            send_email(
+                smtp_host=current_app.config["SMTP_HOST"],
+                smtp_port=current_app.config["SMTP_PORT"],
+                smtp_user=current_app.config["SMTP_USER"],
+                smtp_password=current_app.config["SMTP_PASSWORD"],
+                smtp_from=current_app.config["SMTP_FROM"],
+                to_email=email,
+                subject="ADMTPRO 密码重置验证码",
+                body=f\"您的验证码是：{code}，有效期 {current_app.config['SMS_CODE_TTL']} 秒。\",
+            )
+        except Exception as exc:
+            _audit({"username": username, "role": "user"}, "EMAIL_SEND", username, "error", str(exc))
+            return jsonify({"code": "EMAIL_ERROR", "message": "邮件发送失败"}), 502
+    _audit({"username": username, "role": "user"}, "EMAIL_SEND", username, "ok")
+    resp = {"status": "ok"}
+    if current_app.config["APP_ENV"] == "development":
+        resp["dev_code"] = code
+    return jsonify(resp)
+
+
+@api_bp.post("/auth/email/reset")
+def email_reset():
+    payload = request.get_json(silent=True) or {}
+    username = payload.get("username", "").strip()
+    code = payload.get("code", "").strip()
+    new_password = payload.get("newPassword", "")
+    if not username or not code or not new_password:
+        return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+    if not verify_email_code(current_app.config["DB_URL"], username, "forgot", code):
+        return jsonify({"code": "AUTH_INVALID", "message": "验证码无效或已过期"}), 401
+    ldap_client = _ldap_client()
+    user_dn = ldap_client.get_user_dn(username)
+    if not user_dn:
+        return jsonify({"code": "OBJECT_NOT_FOUND", "message": "用户不存在"}), 404
+    try:
+        ldap_client.reset_password(user_dn, new_password)
+    except ADConnectionError as exc:
+        message = str(exc)
+        code = "AD_ERROR"
+        if "password" in message.lower():
+            code = "AD_POLICY_VIOLATION"
+        _audit({"username": username, "role": "user"}, "PASSWORD_RESET_FORGOT", username, "error", message)
+        return jsonify({"code": code, "message": "密码策略不符合要求"}), 400
+    _audit({"username": username, "role": "user"}, "PASSWORD_RESET_FORGOT", username, "ok")
+    return jsonify({"status": "ok"})
+
+
 @api_bp.post("/me/password")
 def change_password():
     actor = _require_session()
@@ -410,6 +504,7 @@ def create_user():
     for key in ["mail", "mobile", "department", "title"]:
         if payload.get(key):
             attrs[key] = payload[key]
+    force_change = bool(payload.get("forceChangeAtFirstLogin", False))
     ldap_client = _ldap_client()
     try:
         ldap_client.create_user(
@@ -418,6 +513,7 @@ def create_user():
             ou_dn=payload["ouDn"],
             password=payload["password"],
             attributes=attrs,
+            force_change=force_change,
         )
     except ADConnectionError as exc:
         message = str(exc)
@@ -426,7 +522,13 @@ def create_user():
             code = "AD_POLICY_VIOLATION"
         _audit(actor, "USER_CREATE", payload.get("sAMAccountName", ""), "error", message)
         return jsonify({"code": code, "message": "密码策略不符合要求"}), 400
-    _audit(actor, "USER_CREATE", payload.get("sAMAccountName", ""), "ok")
+    _audit(
+        actor,
+        "USER_CREATE",
+        payload.get("sAMAccountName", ""),
+        "ok",
+        after={"ou": payload.get("ouDn", ""), "attrs": attrs},
+    )
     return jsonify({"status": "ok"})
 
 
@@ -446,12 +548,14 @@ def update_user(username: str):
     user_dn = ldap_client.get_user_dn(username)
     if not user_dn:
         return jsonify({"code": "OBJECT_NOT_FOUND", "message": "用户不存在"}), 404
+    before = ldap_client.get_user_info(username) or {}
     try:
         ldap_client.update_user(user_dn, changes)
     except ADConnectionError as exc:
         _audit(actor, "USER_UPDATE", username, "error", str(exc))
         return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
-    _audit(actor, "USER_UPDATE", username, "ok")
+    after = ldap_client.get_user_info(username) or {}
+    _audit(actor, "USER_UPDATE", username, "ok", before=before, after=after)
     return jsonify({"status": "ok"})
 
 
@@ -472,7 +576,14 @@ def set_user_status(username: str):
     except ADConnectionError as exc:
         _audit(actor, "USER_STATUS", username, "error", str(exc))
         return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
-    _audit(actor, "USER_STATUS", username, "ok", f"enabled={payload['enabled']}")
+    _audit(
+        actor,
+        "USER_STATUS",
+        username,
+        "ok",
+        before={"enabled": not bool(payload["enabled"])},
+        after={"enabled": bool(payload["enabled"])},
+    )
     return jsonify({"status": "ok"})
 
 
@@ -483,6 +594,7 @@ def reset_password(username: str):
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
     payload = request.get_json(silent=True) or {}
     new_password = payload.get("newPassword", "")
+    force_change = bool(payload.get("forceChangeAtFirstLogin", False))
     if not new_password:
         return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
     ldap_client = _ldap_client()
@@ -490,7 +602,7 @@ def reset_password(username: str):
     if not user_dn:
         return jsonify({"code": "OBJECT_NOT_FOUND", "message": "用户不存在"}), 404
     try:
-        ldap_client.reset_password(user_dn, new_password)
+        ldap_client.reset_password(user_dn, new_password, force_change=force_change)
     except ADConnectionError as exc:
         message = str(exc)
         code = "AD_ERROR"
@@ -502,6 +614,99 @@ def reset_password(username: str):
     return jsonify({"status": "ok"})
 
 
+@api_bp.get("/users/export")
+def export_users():
+    if not _require_session("admin"):
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    q = request.args.get("q", "").strip()
+    ou = request.args.get("ou", "").strip()
+    status = request.args.get("status", "").strip().lower()
+    enabled = None
+    if status == "enabled":
+        enabled = True
+    elif status == "disabled":
+        enabled = False
+    ldap_client = _ldap_client()
+    users = ldap_client.search_users(query=q, ou_dn=ou, enabled=enabled)
+    header = ["sAMAccountName", "displayName", "mail", "mobile", "department", "title", "dn"]
+    rows = [header]
+    for u in users:
+        rows.append([u.get(k, "") or "" for k in header])
+    csv_text = "\n".join([",".join(row) for row in rows])
+    resp = current_app.response_class(csv_text, mimetype="text/csv")
+    resp.headers["Content-Disposition"] = "attachment; filename=users.csv"
+    return resp
+
+
+@api_bp.post("/users/import")
+def import_users():
+    if not _require_session("admin"):
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    payload = request.get_json(silent=True) or {}
+    csv_text = payload.get("csv", "")
+    if not csv_text:
+        return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+    import csv
+    import io
+
+    ldap_client = _ldap_client()
+    reader = csv.DictReader(io.StringIO(csv_text))
+    created = 0
+    errors = 0
+    for row in reader:
+        try:
+            ldap_client.create_user(
+                sAMAccountName=row.get("sAMAccountName", ""),
+                displayName=row.get("displayName", ""),
+                ou_dn=row.get("ouDn", ""),
+                password=row.get("password", ""),
+                attributes={
+                    "mail": row.get("mail", ""),
+                    "mobile": row.get("mobile", ""),
+                    "department": row.get("department", ""),
+                    "title": row.get("title", ""),
+                },
+                force_change=str(row.get("forceChangeAtFirstLogin", "")).lower() in {"1", "true", "yes"},
+            )
+            created += 1
+        except Exception:
+            errors += 1
+    return jsonify({"created": created, "errors": errors})
+
+
+@api_bp.post("/users/batch")
+def batch_users():
+    if not _require_session("admin"):
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    payload = request.get_json(silent=True) or {}
+    action = payload.get("action", "")
+    usernames = payload.get("usernames", [])
+    if not action or not isinstance(usernames, list) or not usernames:
+        return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+    ldap_client = _ldap_client()
+    count = 0
+    for username in usernames:
+        user_dn = ldap_client.get_user_dn(username)
+        if not user_dn:
+            continue
+        try:
+            if action == "enable":
+                ldap_client.set_user_enabled(user_dn, True)
+            elif action == "disable":
+                ldap_client.set_user_enabled(user_dn, False)
+            elif action == "move":
+                target_ou = payload.get("targetOuDn", "")
+                if not target_ou:
+                    return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+                ldap_client.move_user(user_dn, target_ou)
+            else:
+                return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+            count += 1
+        except Exception:
+            continue
+    return jsonify({"count": count})
+
+
 @api_bp.delete("/users/<username>")
 def delete_user(username: str):
     actor = _require_session("admin")
@@ -511,12 +716,13 @@ def delete_user(username: str):
     user_dn = ldap_client.get_user_dn(username)
     if not user_dn:
         return jsonify({"code": "OBJECT_NOT_FOUND", "message": "用户不存在"}), 404
+    before = ldap_client.get_user_info(username) or {}
     try:
         ldap_client.delete_user(user_dn)
     except ADConnectionError as exc:
         _audit(actor, "USER_DELETE", username, "error", str(exc))
         return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
-    _audit(actor, "USER_DELETE", username, "ok")
+    _audit(actor, "USER_DELETE", username, "ok", before=before)
     return jsonify({"status": "ok"})
 
 
@@ -538,7 +744,14 @@ def move_user(username: str):
     except ADConnectionError as exc:
         _audit(actor, "USER_MOVE_OU", username, "error", str(exc))
         return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
-    _audit(actor, "USER_MOVE_OU", username, "ok", target_ou)
+    _audit(
+        actor,
+        "USER_MOVE_OU",
+        username,
+        "ok",
+        before={"dn": user_dn},
+        after={"ou": target_ou},
+    )
     return jsonify({"status": "ok"})
 
 
@@ -619,8 +832,11 @@ def audit_logs():
     actor = request.args.get("actor", "").strip()
     action = request.args.get("action", "").strip()
     target = request.args.get("target", "").strip()
+    result = request.args.get("result", "").strip()
     limit = int(request.args.get("limit", "100"))
-    items = list_logs(current_app.config["DB_URL"], actor=actor, action=action, target=target, limit=limit)
+    items = list_logs(
+        current_app.config["DB_URL"], actor=actor, action=action, target=target, result=result, limit=limit
+    )
     return jsonify({"items": items})
 
 
@@ -631,8 +847,11 @@ def audit_export():
     actor = request.args.get("actor", "").strip()
     action = request.args.get("action", "").strip()
     target = request.args.get("target", "").strip()
+    result = request.args.get("result", "").strip()
     limit = int(request.args.get("limit", "1000"))
-    csv_text = export_csv(current_app.config["DB_URL"], actor=actor, action=action, target=target, limit=limit)
+    csv_text = export_csv(
+        current_app.config["DB_URL"], actor=actor, action=action, target=target, result=result, limit=limit
+    )
     resp = current_app.response_class(csv_text, mimetype="text/csv")
     resp.headers["Content-Disposition"] = "attachment; filename=audit.csv"
     return resp
@@ -727,4 +946,25 @@ def config_set():
             aliyun_template_code=current_app.config["ALIYUN_SMS_TEMPLATE_NOTIFY"],
         )
         current_app.config["EXPIRY_LOOP_STARTED"] = True
+    return jsonify({"status": "ok"})
+
+
+@api_bp.get("/config/history")
+def config_history():
+    if not _require_session("admin"):
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    limit = int(request.args.get("limit", "100"))
+    items = list_history(current_app.config["DB_URL"], limit=limit)
+    return jsonify({"items": items})
+
+
+@api_bp.post("/config/rollback")
+def config_rollback():
+    if not _require_session("admin"):
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    payload = request.get_json(silent=True) or {}
+    history_id = int(payload.get("id", 0))
+    if history_id <= 0:
+        return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+    rollback(current_app.config["DB_URL"], history_id)
     return jsonify({"status": "ok"})

@@ -14,15 +14,17 @@ def write_log(
     ip: str,
     ua: str,
     detail: Optional[str] = None,
+    before: Optional[dict] = None,
+    after: Optional[dict] = None,
 ) -> None:
     with get_conn(db_url) as conn:
         conn.execute(
             """
             INSERT INTO audit_logs
-              (actor, actor_role, action, target, result, ip, ua, detail)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+              (actor, actor_role, action, target, result, ip, ua, detail, before_json, after_json)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (actor, actor_role, action, target, result, ip, ua, detail),
+            (actor, actor_role, action, target, result, ip, ua, detail, before, after),
         )
 
 
@@ -32,6 +34,7 @@ def list_logs(
     actor: str = "",
     action: str = "",
     target: str = "",
+    result: str = "",
     limit: int = 100,
 ) -> list[dict]:
     where = []
@@ -45,10 +48,13 @@ def list_logs(
     if target:
         where.append("target ILIKE %s")
         params.append(f"%{target}%")
+    if result:
+        where.append("result = %s")
+        params.append(result)
 
     clause = "WHERE " + " AND ".join(where) if where else ""
     sql = (
-        "SELECT id, actor, actor_role, action, target, result, ip, ua, detail, created_at "
+        "SELECT id, actor, actor_role, action, target, result, ip, ua, detail, before_json, after_json, created_at "
         "FROM audit_logs "
         f"{clause} "
         "ORDER BY created_at DESC "
@@ -71,7 +77,9 @@ def list_logs(
                 "ip": row[6],
                 "ua": row[7],
                 "detail": row[8],
-                "created_at": row[9].isoformat(),
+                "before": row[9],
+                "after": row[10],
+                "created_at": row[11].isoformat(),
             }
         )
     return items

@@ -122,7 +122,16 @@ class LDAPClient:
             )
         return users
 
-    def create_user(self, *, sAMAccountName: str, displayName: str, ou_dn: str, password: str, attributes: dict) -> None:
+    def create_user(
+        self,
+        *,
+        sAMAccountName: str,
+        displayName: str,
+        ou_dn: str,
+        password: str,
+        attributes: dict,
+        force_change: bool = False,
+    ) -> None:
         conn = self._service_conn()
         user_dn = f"CN={displayName},{ou_dn}"
         user_principal = f"{sAMAccountName}@{self._domain_from_base_dn()}"
@@ -136,6 +145,8 @@ class LDAPClient:
         if not conn.add(user_dn, attributes=attrs):
             raise ADConnectionError(conn.result.get("message", "add failed"))
         self._set_password(conn, user_dn, password)
+        if force_change:
+            self._set_pwd_must_change(conn, user_dn)
         self._set_enabled(conn, user_dn, True)
 
     def update_user(self, user_dn: str, changes: dict) -> None:
@@ -148,9 +159,11 @@ class LDAPClient:
         conn = self._service_conn()
         self._set_enabled(conn, user_dn, enabled)
 
-    def reset_password(self, user_dn: str, new_password: str) -> None:
+    def reset_password(self, user_dn: str, new_password: str, force_change: bool = False) -> None:
         conn = self._service_conn()
         self._set_password(conn, user_dn, new_password)
+        if force_change:
+            self._set_pwd_must_change(conn, user_dn)
 
     def change_password(self, username: str, old_password: str, new_password: str) -> None:
         user_dn = self.get_user_dn(username)
@@ -257,6 +270,10 @@ class LDAPClient:
         uac = 512 if enabled else 514
         if not conn.modify(user_dn, {"userAccountControl": [(MODIFY_REPLACE, [uac])]}):
             raise ADConnectionError(conn.result.get("message", "set enabled failed"))
+
+    def _set_pwd_must_change(self, conn: Connection, user_dn: str) -> None:
+        if not conn.modify(user_dn, {"pwdLastSet": [(MODIFY_REPLACE, [0])]}):
+            raise ADConnectionError(conn.result.get("message", "set pwdLastSet failed"))
 
     def _domain_from_base_dn(self) -> str:
         parts = []

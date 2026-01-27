@@ -7,6 +7,9 @@ import {
   resetUserPassword,
   deleteUser,
   moveUser,
+  batchUsers,
+  exportUsers,
+  importUsers,
   listOus,
   createOu,
   updateOu,
@@ -77,7 +80,12 @@ export default function AdminConsolePage() {
     title: ""
   });
   const [resetPassword, setResetPassword] = useState("");
+  const [resetForceChange, setResetForceChange] = useState(false);
   const [moveTargetOu, setMoveTargetOu] = useState("");
+  const [createForceChange, setCreateForceChange] = useState(false);
+  const [selectedSet, setSelectedSet] = useState<Record<string, boolean>>({});
+  const [importCsv, setImportCsv] = useState("");
+  const [batchTargetOu, setBatchTargetOu] = useState("");
 
   useEffect(() => {
     setMessage("");
@@ -91,6 +99,7 @@ export default function AdminConsolePage() {
     }
     const data = await listUsers(token, { q, ou: ouFilter, status });
     setUsers(data.items || []);
+    setSelectedSet({});
   }
 
   async function loadOus() {
@@ -112,7 +121,7 @@ export default function AdminConsolePage() {
       setMessage("创建用户需填写账号/姓名/OU DN/初始密码");
       return;
     }
-    await createUser(token, newUser);
+    await createUser(token, { ...newUser, forceChangeAtFirstLogin: createForceChange });
     toast.push("用户创建成功", "success");
     await loadUsers();
   }
@@ -148,6 +157,7 @@ export default function AdminConsolePage() {
   function openReset(user: User) {
     setSelectedUser(user);
     setResetPassword("");
+    setResetForceChange(false);
     setResetOpen(true);
   }
 
@@ -161,7 +171,7 @@ export default function AdminConsolePage() {
       setMessage("请输入新密码");
       return;
     }
-    await resetUserPassword(token, selectedUser.sAMAccountName, resetPassword);
+    await resetUserPassword(token, selectedUser.sAMAccountName, resetPassword, resetForceChange);
     toast.push("密码已重置", "success");
     setResetOpen(false);
   }
@@ -300,6 +310,18 @@ export default function AdminConsolePage() {
               <table className="table">
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={users.length > 0 && selectedUsernames.length === users.length}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      const next: Record<string, boolean> = {};
+                      users.forEach((u) => (next[u.sAMAccountName] = checked));
+                      setSelectedSet(next);
+                    }}
+                  />
+                </th>
                 <th>账号</th>
                 <th>姓名</th>
                 <th>邮箱</th>
@@ -311,6 +333,15 @@ export default function AdminConsolePage() {
             <tbody>
               {users.map((u) => (
                 <tr key={u.dn} onClick={() => setSelectedUser(u)}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={!!selectedSet[u.sAMAccountName]}
+                      onChange={(e) =>
+                        setSelectedSet({ ...selectedSet, [u.sAMAccountName]: e.target.checked })
+                      }
+                    />
+                  </td>
                   <td>{u.sAMAccountName}</td>
                   <td>{u.displayName}</td>
                   <td>{u.mail}</td>
@@ -341,7 +372,29 @@ export default function AdminConsolePage() {
                 </tr>
               ))}
             </tbody>
-              </table>
+          </table>
+              <div className="actions">
+                <button className="button secondary" onClick={() => handleBatch("enable")}>
+                  批量启用
+                </button>
+                <button className="button secondary" onClick={() => handleBatch("disable")}>
+                  批量禁用
+                </button>
+                <select className="input" value={batchTargetOu} onChange={(e) => setBatchTargetOu(e.target.value)}>
+                  <option value="">选择目标 OU</option>
+                  {ouOptions.map((o) => (
+                    <option key={o.dn} value={o.dn}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <button className="button secondary" onClick={() => handleBatch("move")}>
+                  批量移动
+                </button>
+                <button className="button" onClick={handleExport}>
+                  导出 CSV
+                </button>
+              </div>
             </div>
             <div className="side-panel">
               <h3>用户详情</h3>
@@ -401,8 +454,31 @@ export default function AdminConsolePage() {
               value={newUser.password}
               onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
             />
+            <label className="badge">
+              <input
+                type="checkbox"
+                checked={createForceChange}
+                onChange={(e) => setCreateForceChange(e.target.checked)}
+              />{" "}
+              首次登录改密
+            </label>
             <button className="button" onClick={handleCreateUser}>
               创建
+            </button>
+          </div>
+          <h3>批量导入</h3>
+          <div className="form-row">
+            <span className="label">CSV 内容</span>
+            <textarea
+              className="input"
+              rows={6}
+              value={importCsv}
+              onChange={(e) => setImportCsv(e.target.value)}
+            />
+          </div>
+          <div className="actions">
+            <button className="button secondary" onClick={handleImport}>
+              导入
             </button>
           </div>
         </div>
@@ -527,6 +603,14 @@ export default function AdminConsolePage() {
             onChange={(e) => setResetPassword(e.target.value)}
           />
         </div>
+        <label className="badge">
+          <input
+            type="checkbox"
+            checked={resetForceChange}
+            onChange={(e) => setResetForceChange(e.target.checked)}
+          />{" "}
+          首次登录改密
+        </label>
         <div className="actions">
           <button className="button" onClick={handleResetPassword}>
             确认重置
@@ -615,3 +699,54 @@ export default function AdminConsolePage() {
     </div>
   );
 }
+  const selectedUsernames = useMemo(
+    () => Object.keys(selectedSet).filter((k) => selectedSet[k]),
+    [selectedSet]
+  );
+
+  async function handleBatch(action: "enable" | "disable" | "move") {
+    if (!token.trim()) {
+      setMessage("请输入管理员 Token");
+      return;
+    }
+    if (selectedUsernames.length === 0) {
+      setMessage("请先选择用户");
+      return;
+    }
+    if (action === "move" && !batchTargetOu) {
+      setMessage("请选择目标 OU");
+      return;
+    }
+    await batchUsers(token, { action, usernames: selectedUsernames, targetOuDn: batchTargetOu || undefined });
+    toast.push("批量操作完成", "success");
+    await loadUsers();
+  }
+
+  async function handleExport() {
+    if (!token.trim()) {
+      setMessage("请输入管理员 Token");
+      return;
+    }
+    const csv = await exportUsers(token, { q, ou: ouFilter, status });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "users.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImport() {
+    if (!token.trim()) {
+      setMessage("请输入管理员 Token");
+      return;
+    }
+    if (!importCsv.trim()) {
+      setMessage("请输入 CSV 内容");
+      return;
+    }
+    const res = await importUsers(token, importCsv);
+    toast.push(`导入完成：成功 ${res.created} 条，失败 ${res.errors} 条`, "success");
+    await loadUsers();
+  }

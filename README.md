@@ -6,15 +6,18 @@ AD 域控管理工具（BS 架构，前后端分离），支持普通用户自�
 
 - 普通用户登录、查看自身信息（姓名/邮箱/手机号）
 - 自助改密（旧密码 + 短信验证码）
-- 忘记密码（短信验证码）
+- 忘记密码（短信/邮件验证码）
 - 管理员登录 + OTP 二次验证
 - 用户管理：增删改查/启用/禁用/重置密码/移动 OU
+- 批量操作：导入/导出/批量启用禁用/批量移动 OU
+- 新建/重置密码支持“首次登录强制改密”
 - OU 管理：增删改查
 - 审计日志（DDL 全覆盖）
 - 短信发送日志与失败重试（手动/自动）
 - 密码到期提醒（短信通知）
 - 站内通知（展示到期提醒记录）
 - 配置中心（短信/LDAP/OTP/提醒阈值）
+- 系统健康检查（API/DB/LDAP）
 
 ## 技术栈
 
@@ -70,11 +73,14 @@ docker compose up --build
   - `PASSWORD_EXPIRY_ENABLE`
   - `PASSWORD_EXPIRY_DAYS`（如 `7,3,1`）
   - `PASSWORD_EXPIRY_CHECK_INTERVAL`
+- 邮件（可选）
+  - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM`
 
 ## 说明
 
 - 密码到期提醒使用 AD 属性 `msDS-UserPasswordExpiryTimeComputed`。
 - 忘记密码与自助改密均通过短信验证码校验。
+- 忘记密码支持邮件验证码（需配置 SMTP）。
 - 审计日志记录所有用户/OU 相关 DDL 操作。
 - 用户搜索支持：账号/中文姓名/邮箱/手机号（若拼音存于 `displayName/cn` 亦可匹配）。
 - 登录失败达到阈值会触发账号锁定（可配置）。
@@ -90,6 +96,8 @@ docker compose up --build
   - `GET /api/me`
   - `POST /api/me/password`
   - `POST /api/auth/forgot/reset`
+  - `POST /api/auth/email/send`
+  - `POST /api/auth/email/reset`
 - 短信
   - `POST /api/auth/sms/send`
   - `POST /api/sms/retry`
@@ -103,10 +111,16 @@ docker compose up --build
   - `GET /api/config`
   - `PUT /api/config`
   - 保存后会覆盖运行时配置，并可在开启时自动启动短信重试/到期提醒后台任务
+  - `GET /api/config/history`
+  - `POST /api/config/rollback`
+- 健康检查
+  - `GET /api/health`
+  - `GET /api/health/details`
 - 用户/OU 管理
   - `GET /api/users` / `POST /api/users` / `PUT /api/users/:username`
   - `PATCH /api/users/:username/status` / `POST /api/users/:username/reset-password`
   - `DELETE /api/users/:username` / `POST /api/users/:username/move`
+  - `GET /api/users/export` / `POST /api/users/import` / `POST /api/users/batch`
   - `GET /api/ous` / `POST /api/ous` / `PUT /api/ous` / `DELETE /api/ous`
 - 审计
   - `GET /api/audit`

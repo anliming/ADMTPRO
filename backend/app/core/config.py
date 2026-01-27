@@ -43,6 +43,11 @@ def load_config() -> dict:
         "PASSWORD_EXPIRY_ENABLE": os.getenv("PASSWORD_EXPIRY_ENABLE", "false").lower() == "true",
         "PASSWORD_EXPIRY_DAYS": os.getenv("PASSWORD_EXPIRY_DAYS", "7,3,1"),
         "PASSWORD_EXPIRY_CHECK_INTERVAL": _get_int("PASSWORD_EXPIRY_CHECK_INTERVAL", 3600),
+        "SMTP_HOST": os.getenv("SMTP_HOST", ""),
+        "SMTP_PORT": _get_int("SMTP_PORT", 587),
+        "SMTP_USER": os.getenv("SMTP_USER", ""),
+        "SMTP_PASSWORD": os.getenv("SMTP_PASSWORD", ""),
+        "SMTP_FROM": os.getenv("SMTP_FROM", ""),
     }
 
 

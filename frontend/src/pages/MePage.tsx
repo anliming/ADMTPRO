@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { changePassword, me, sendSmsCode } from "../services/api";
+import { changePassword, listNotifications, me, sendSmsCode } from "../services/api";
 import { useToken } from "../store";
 
 export default function MePage() {
@@ -9,6 +9,8 @@ export default function MePage() {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [code, setCode] = useState("");
+  const [notices, setNotices] = useState<any[]>([]);
+  const strength = getStrength(newPassword);
 
   async function handleLoad() {
     setError("");
@@ -49,15 +51,16 @@ export default function MePage() {
           onChange={(e) => setOldPassword(e.target.value)}
         />
       </div>
-      <div className="form-row">
-        <span className="label">新密码</span>
-        <input
-          className="input"
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-        />
-      </div>
+        <div className="form-row">
+          <span className="label">新密码</span>
+          <input
+            className="input"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <span className="badge">强度：{strength}</span>
+        </div>
       <div className="form-row">
         <span className="label">短信验证码</span>
         <div className="actions">
@@ -112,6 +115,61 @@ export default function MePage() {
           修改密码
         </button>
       </div>
+      <h3>到期提醒</h3>
+      <div className="actions">
+        <button
+          className="button secondary"
+          type="button"
+          onClick={async () => {
+            if (!token.trim()) {
+              setError("请输入 Token");
+              return;
+            }
+            try {
+              const data = await listNotifications(token);
+              setNotices(data.items || []);
+            } catch (err) {
+              setError((err as Error).message);
+            }
+          }}
+        >
+          加载提醒
+        </button>
+      </div>
+      {notices.length > 0 && (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>提醒日期</th>
+              <th>剩余天数</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            {notices.map((n) => (
+              <tr key={n.id}>
+                <td>{n.id}</td>
+                <td>{n.notify_date}</td>
+                <td>{n.days_left}</td>
+                <td>{n.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
+}
+
+function getStrength(pwd: string): string {
+  let score = 0;
+  if (pwd.length >= 8) score += 1;
+  if (/[A-Z]/.test(pwd)) score += 1;
+  if (/[a-z]/.test(pwd)) score += 1;
+  if (/[0-9]/.test(pwd)) score += 1;
+  if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
+  if (score <= 2) return "弱";
+  if (score === 3) return "中";
+  return "强";
 }

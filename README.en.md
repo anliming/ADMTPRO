@@ -6,15 +6,18 @@ AD domain management tool (BS architecture, separated frontend/backend) for self
 
 - User login and self profile view (name/email/mobile)
 - Self password change (old password + SMS code)
-- Forgot password (SMS code)
+- Forgot password (SMS/email code)
 - Admin login with OTP
 - User management: CRUD / enable / disable / reset password / move OU
+- Bulk actions: import/export, batch enable/disable/move
+- Force change password at first login (create/reset)
 - OU management: CRUD
 - Audit logs for all DDL operations
 - SMS log & retry (manual/auto)
 - Password expiry reminders (SMS)
 - In-app notifications (expiry records)
 - Config center (LDAP/SMS/OTP/expiry settings)
+- Health checks (API/DB/LDAP)
 
 ## Tech Stack
 
@@ -70,11 +73,13 @@ docker compose up --build
   - `PASSWORD_EXPIRY_ENABLE`
   - `PASSWORD_EXPIRY_DAYS` (e.g. `7,3,1`)
   - `PASSWORD_EXPIRY_CHECK_INTERVAL`
+- Email (optional)
+  - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM`
 
 ## Notes
 
 - Password expiry uses AD attribute `msDS-UserPasswordExpiryTimeComputed`.
-- Dev mode returns `dev_code` for SMS flows.
+- Dev mode returns `dev_code` for SMS/email flows.
 - Ensure SMS templates and signatures are approved in production.
 - User search matches sAMAccountName / displayName / cn / mail / mobile (pinyin only if stored in those fields).
 - Login failures trigger account lock based on configured thresholds.
@@ -90,6 +95,8 @@ docker compose up --build
   - `GET /api/me`
   - `POST /api/me/password`
   - `POST /api/auth/forgot/reset`
+  - `POST /api/auth/email/send`
+  - `POST /api/auth/email/reset`
 - SMS
   - `POST /api/auth/sms/send`
   - `POST /api/sms/retry`
@@ -103,10 +110,16 @@ docker compose up --build
   - `GET /api/config`
   - `PUT /api/config`
   - Saved config overrides runtime and can start SMS retry / expiry loops when enabled
+  - `GET /api/config/history`
+  - `POST /api/config/rollback`
+- Health
+  - `GET /api/health`
+  - `GET /api/health/details`
 - User/OU management
   - `GET /api/users` / `POST /api/users` / `PUT /api/users/:username`
   - `PATCH /api/users/:username/status` / `POST /api/users/:username/reset-password`
   - `DELETE /api/users/:username` / `POST /api/users/:username/move`
+  - `GET /api/users/export` / `POST /api/users/import` / `POST /api/users/batch`
   - `GET /api/ous` / `POST /api/ous` / `PUT /api/ous` / `DELETE /api/ous`
 - Audit
   - `GET /api/audit`
