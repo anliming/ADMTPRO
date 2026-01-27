@@ -219,7 +219,7 @@ def otp_setup():
     secret = create_secret(current_app.config["DB_URL"], username)
     issuer = current_app.config["OTP_ISSUER"]
     uri = f"otpauth://totp/{issuer}:{username}?secret={secret}&issuer={issuer}"
-    return jsonify({\"secret\": secret, \"otpauth_uri\": uri})
+    return jsonify({"secret": secret, "otpauth_uri": uri})
 
 
 @api_bp.get("/me")
