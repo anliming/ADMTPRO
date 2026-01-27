@@ -273,6 +273,58 @@ export default function AdminConsolePage() {
     });
   }, [ous]);
 
+  const selectedUsernames = useMemo(
+    () => Object.keys(selectedSet).filter((k) => selectedSet[k]),
+    [selectedSet]
+  );
+
+  async function handleBatch(action: "enable" | "disable" | "move") {
+    if (!token.trim()) {
+      setMessage("请输入管理员 Token");
+      return;
+    }
+    if (selectedUsernames.length === 0) {
+      setMessage("请先选择用户");
+      return;
+    }
+    if (action === "move" && !batchTargetOu) {
+      setMessage("请选择目标 OU");
+      return;
+    }
+    await batchUsers(token, { action, usernames: selectedUsernames, targetOuDn: batchTargetOu || undefined });
+    toast.push("批量操作完成", "success");
+    await loadUsers();
+  }
+
+  async function handleExport() {
+    if (!token.trim()) {
+      setMessage("请输入管理员 Token");
+      return;
+    }
+    const csv = await exportUsers(token, { q, ou: ouFilter, status });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "users.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImport() {
+    if (!token.trim()) {
+      setMessage("请输入管理员 Token");
+      return;
+    }
+    if (!importCsv.trim()) {
+      setMessage("请输入 CSV 内容");
+      return;
+    }
+    const res = await importUsers(token, importCsv);
+    toast.push(`导入完成：成功 ${res.created} 条，失败 ${res.errors} 条`, "success");
+    await loadUsers();
+  }
+
   return (
     <div className="panel">
       <h2>管理台（简版）</h2>
@@ -699,54 +751,3 @@ export default function AdminConsolePage() {
     </div>
   );
 }
-  const selectedUsernames = useMemo(
-    () => Object.keys(selectedSet).filter((k) => selectedSet[k]),
-    [selectedSet]
-  );
-
-  async function handleBatch(action: "enable" | "disable" | "move") {
-    if (!token.trim()) {
-      setMessage("请输入管理员 Token");
-      return;
-    }
-    if (selectedUsernames.length === 0) {
-      setMessage("请先选择用户");
-      return;
-    }
-    if (action === "move" && !batchTargetOu) {
-      setMessage("请选择目标 OU");
-      return;
-    }
-    await batchUsers(token, { action, usernames: selectedUsernames, targetOuDn: batchTargetOu || undefined });
-    toast.push("批量操作完成", "success");
-    await loadUsers();
-  }
-
-  async function handleExport() {
-    if (!token.trim()) {
-      setMessage("请输入管理员 Token");
-      return;
-    }
-    const csv = await exportUsers(token, { q, ou: ouFilter, status });
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "users.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function handleImport() {
-    if (!token.trim()) {
-      setMessage("请输入管理员 Token");
-      return;
-    }
-    if (!importCsv.trim()) {
-      setMessage("请输入 CSV 内容");
-      return;
-    }
-    const res = await importUsers(token, importCsv);
-    toast.push(`导入完成：成功 ${res.created} 条，失败 ${res.errors} 条`, "success");
-    await loadUsers();
-  }
