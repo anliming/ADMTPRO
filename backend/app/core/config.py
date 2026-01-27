@@ -23,6 +23,8 @@ def load_config() -> dict:
         "DB_URL": os.getenv("DB_URL", ""),
         "SMS_CODE_TTL": _get_int("SMS_CODE_TTL", 300),
         "SMS_SEND_INTERVAL": _get_int("SMS_SEND_INTERVAL", 60),
+        "LOGIN_MAX_FAILS": _get_int("LOGIN_MAX_FAILS", 5),
+        "LOGIN_LOCK_MINUTES": _get_int("LOGIN_LOCK_MINUTES", 10),
         "LDAP_URL": os.getenv("LDAP_URL", ""),
         "LDAP_BIND_DN": os.getenv("LDAP_BIND_DN", ""),
         "LDAP_BIND_PASSWORD": os.getenv("LDAP_BIND_PASSWORD", ""),

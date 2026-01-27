@@ -14,6 +14,7 @@ AD 域控管理工具（BS 架构，前后端分离），支持普通用户自�
 - 短信发送日志与失败重试（手动/自动）
 - 密码到期提醒（短信通知）
 - 站内通知（展示到期提醒记录）
+- 配置中心（短信/LDAP/OTP/提醒阈值）
 
 ## 技术栈
 
@@ -76,6 +77,7 @@ docker compose up --build
 - 忘记密码与自助改密均通过短信验证码校验。
 - 审计日志记录所有用户/OU 相关 DDL 操作。
 - 用户搜索支持：账号/中文姓名/邮箱/手机号（若拼音存于 `displayName/cn` 亦可匹配）。
+- 登录失败达到阈值会触发账号锁定（可配置）。
 
 ## 主要接口（摘要）
 
@@ -96,6 +98,9 @@ docker compose up --build
   - `POST /api/password-expiry/trigger`
 - 站内通知
   - `GET /api/notifications`
+- 配置中心
+  - `GET /api/config`
+  - `PUT /api/config`
 - 用户/OU 管理
   - `GET /api/users` / `POST /api/users` / `PUT /api/users/:username`
   - `PATCH /api/users/:username/status` / `POST /api/users/:username/reset-password`

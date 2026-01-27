@@ -79,3 +79,21 @@ def init_db(db_url: str) -> None:
             );
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS login_attempts (
+              username TEXT PRIMARY KEY,
+              fail_count INT NOT NULL DEFAULT 0,
+              locked_until TIMESTAMPTZ
+            );
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS system_config (
+              key TEXT PRIMARY KEY,
+              value_json JSONB NOT NULL,
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )

@@ -16,6 +16,8 @@ from ..services.sms_service import (
 )
 from ..services.password_expiry import trigger_password_expiry_check
 from ..services.notify_service import list_expiry_notifies
+from ..services.auth_service import clear_fail, is_locked, record_fail
+from ..services.config_service import get_config, set_config
 from ..core.errors import ADConnectionError
 
 api_bp = Blueprint("api", __name__)
@@ -78,10 +80,20 @@ def login():
     role_hint = payload.get("roleHint", "")
     if not username or not password:
         return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+    locked_until = is_locked(current_app.config["DB_URL"], username)
+    if locked_until:
+        return jsonify({"code": "RATE_LIMITED", "message": "账号已锁定，请稍后再试"}), 429
 
     ldap_client = _ldap_client()
     if not ldap_client.authenticate_user(username, password):
+        record_fail(
+            current_app.config["DB_URL"],
+            username,
+            current_app.config.get("LOGIN_MAX_FAILS", 5),
+            current_app.config.get("LOGIN_LOCK_MINUTES", 10),
+        )
         return jsonify({"code": "AUTH_INVALID", "message": "账号或密码错误"}), 401
+    clear_fail(current_app.config["DB_URL"], username)
 
     user_info = ldap_client.get_user_info(username) or {}
     is_admin = ldap_client.is_user_admin(username, current_app.config["ADMIN_GROUP_DN"])
@@ -153,6 +165,11 @@ def otp_verify():
         current_app.config["APP_SECRET"], {"type": "session", "username": username, "role": "admin"}
     )
     return jsonify({"token": session_token})
+
+
+@api_bp.post("/auth/logout")
+def logout():
+    return jsonify({"status": "ok"})
 
 
 @api_bp.post("/auth/otp/setup")
@@ -335,8 +352,12 @@ def change_password():
     try:
         ldap_client.change_password(username, old_password, new_password)
     except ADConnectionError as exc:
-        _audit(actor, "PASSWORD_CHANGE_SELF", username, "error", str(exc))
-        return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
+        message = str(exc)
+        code = "AD_ERROR"
+        if "password" in message.lower():
+            code = "AD_POLICY_VIOLATION"
+        _audit(actor, "PASSWORD_CHANGE_SELF", username, "error", message)
+        return jsonify({"code": code, "message": "密码策略不符合要求"}), 400
     _audit(actor, "PASSWORD_CHANGE_SELF", username, "ok")
     return jsonify({"status": "ok"})
 
@@ -450,8 +471,12 @@ def reset_password(username: str):
     try:
         ldap_client.reset_password(user_dn, new_password)
     except ADConnectionError as exc:
-        _audit(actor, "PASSWORD_RESET_ADMIN", username, "error", str(exc))
-        return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
+        message = str(exc)
+        code = "AD_ERROR"
+        if "password" in message.lower():
+            code = "AD_POLICY_VIOLATION"
+        _audit(actor, "PASSWORD_RESET_ADMIN", username, "error", message)
+        return jsonify({"code": code, "message": "密码策略不符合要求"}), 400
     _audit(actor, "PASSWORD_RESET_ADMIN", username, "ok")
     return jsonify({"status": "ok"})
 
@@ -614,4 +639,34 @@ def password_expiry_trigger():
         aliyun_sign_name=current_app.config["ALIYUN_SMS_SIGN_NAME"],
         aliyun_template_code=current_app.config["ALIYUN_SMS_TEMPLATE_NOTIFY"],
     )
+    return jsonify({"status": "ok"})
+
+
+@api_bp.get("/config")
+def config_get():
+    if not _require_session("admin"):
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    overrides = get_config(current_app.config["DB_URL"])
+    data = {
+        "LDAP_URL": current_app.config["LDAP_URL"],
+        "LDAP_BASE_DN": current_app.config["LDAP_BASE_DN"],
+        "ADMIN_GROUP_DN": current_app.config["ADMIN_GROUP_DN"],
+        "OTP_ISSUER": current_app.config["OTP_ISSUER"],
+        "SMS_SEND_INTERVAL": current_app.config["SMS_SEND_INTERVAL"],
+        "SMS_CODE_TTL": current_app.config["SMS_CODE_TTL"],
+        "PASSWORD_EXPIRY_ENABLE": current_app.config["PASSWORD_EXPIRY_ENABLE"],
+        "PASSWORD_EXPIRY_DAYS": current_app.config["PASSWORD_EXPIRY_DAYS"],
+        "PASSWORD_EXPIRY_CHECK_INTERVAL": current_app.config["PASSWORD_EXPIRY_CHECK_INTERVAL"],
+    }
+    data.update(overrides)
+    return jsonify(data)
+
+
+@api_bp.put("/config")
+def config_set():
+    if not _require_session("admin"):
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    payload = request.get_json(silent=True) or {}
+    for key, value in payload.items():
+        set_config(current_app.config["DB_URL"], key, value)
     return jsonify({"status": "ok"})

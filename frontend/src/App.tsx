@@ -9,6 +9,7 @@ import AuditLogPage from "./pages/AuditLogPage";
 import SmsLogPage from "./pages/SmsLogPage";
 import PasswordExpiryPage from "./pages/PasswordExpiryPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import ConfigPage from "./pages/ConfigPage";
 import { useToken } from "./store";
 
 type Page =
@@ -20,7 +21,8 @@ type Page =
   | "audit"
   | "sms"
   | "expiry"
-  | "notifications";
+  | "notifications"
+  | "config";
 
 export default function App() {
   const [page, setPage] = useState<Page>("login");
@@ -90,6 +92,9 @@ export default function App() {
         >
           站内通知
         </button>
+        <button className={page === "config" ? "active" : ""} onClick={() => setPage("config")}>
+          配置中心
+        </button>
       </div>
 
       {page === "login" && <LoginPage />}
@@ -101,6 +106,7 @@ export default function App() {
       {page === "sms" && <SmsLogPage />}
       {page === "expiry" && <PasswordExpiryPage />}
       {page === "notifications" && <NotificationsPage />}
+      {page === "config" && <ConfigPage />}
     </div>
   );
 }

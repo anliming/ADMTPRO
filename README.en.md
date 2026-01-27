@@ -14,6 +14,7 @@ AD domain management tool (BS architecture, separated frontend/backend) for self
 - SMS log & retry (manual/auto)
 - Password expiry reminders (SMS)
 - In-app notifications (expiry records)
+- Config center (LDAP/SMS/OTP/expiry settings)
 
 ## Tech Stack
 
@@ -76,6 +77,7 @@ docker compose up --build
 - Dev mode returns `dev_code` for SMS flows.
 - Ensure SMS templates and signatures are approved in production.
 - User search matches sAMAccountName / displayName / cn / mail / mobile (pinyin only if stored in those fields).
+- Login failures trigger account lock based on configured thresholds.
 
 ## API Summary
 
@@ -96,6 +98,9 @@ docker compose up --build
   - `POST /api/password-expiry/trigger`
 - Notifications
   - `GET /api/notifications`
+- Config
+  - `GET /api/config`
+  - `PUT /api/config`
 - User/OU management
   - `GET /api/users` / `POST /api/users` / `PUT /api/users/:username`
   - `PATCH /api/users/:username/status` / `POST /api/users/:username/reset-password`
