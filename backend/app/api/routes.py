@@ -218,7 +218,7 @@ def otp_setup():
     username = data.get("username", "")
     secret = create_secret(current_app.config["DB_URL"], username)
     issuer = current_app.config["OTP_ISSUER"]
-    uri = f\"otpauth://totp/{issuer}:{username}?secret={secret}&issuer={issuer}\"
+    uri = f"otpauth://totp/{issuer}:{username}?secret={secret}&issuer={issuer}"
     return jsonify({\"secret\": secret, \"otpauth_uri\": uri})
 
 
@@ -406,7 +406,7 @@ def send_email_code():
                 smtp_from=current_app.config["SMTP_FROM"],
                 to_email=email,
                 subject="ADMTPRO 密码重置验证码",
-                body=f\"您的验证码是：{code}，有效期 {current_app.config['SMS_CODE_TTL']} 秒。\",
+                body=f"您的验证码是：{code}，有效期 {current_app.config['SMS_CODE_TTL']} 秒。",
             )
         except Exception as exc:
             _audit({"username": username, "role": "user"}, "EMAIL_SEND", username, "error", str(exc))
