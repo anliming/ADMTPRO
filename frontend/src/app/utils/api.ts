@@ -1,5 +1,9 @@
 // API 客户端配置
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+const resolvedBaseUrl = rawBaseUrl && rawBaseUrl !== '/' ? rawBaseUrl : '/api';
+const API_BASE_URL = resolvedBaseUrl.endsWith('/')
+  ? resolvedBaseUrl.slice(0, -1)
+  : resolvedBaseUrl;
 
 // Token 管理
 class TokenManager {
