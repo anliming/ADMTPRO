@@ -455,6 +455,18 @@ export function UserManagement() {
           <div className="text-sm text-muted-foreground">
             第 {currentPage} / {totalPages} 页
           </div>
+          <div className="flex items-center gap-2">
+            <Label>跳转</Label>
+            <Input
+              value={String(currentPage)}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\\D/g, '');
+                const num = val ? Number(val) : 1;
+                setPage(Math.min(totalPages, Math.max(1, num)));
+              }}
+              className="w-20"
+            />
+          </div>
           <Button
             variant="outline"
             size="sm"
