@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 type Page = 'user-login' | 'admin-login' | 'forgot-password';
 
 function AppContent() {
-  const { isAuthenticated, isAdmin, isLoading, logout } = useAuth();
+  const { isAuthenticated, isAdmin, isLoading, logout, user } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('user-login');
 
   const pageFromPath = (pathname: string): Page => {
@@ -59,9 +59,19 @@ function AppContent() {
   // 已登录状态
   if (isAuthenticated) {
     if (isAdmin) {
-      return <AdminDashboard onLogout={logout} />;
+      return (
+        <AdminDashboard
+          username={user?.displayName || user?.sAMAccountName || '管理员'}
+          onLogout={logout}
+        />
+      );
     }
-    return <UserDashboard onLogout={logout} />;
+    return (
+      <UserDashboard
+        username={user?.displayName || user?.sAMAccountName || '用户'}
+        onLogout={logout}
+      />
+    );
   }
 
   // 未登录状态 - 显示登录页面
