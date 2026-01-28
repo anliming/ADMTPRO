@@ -1,20 +1,19 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-
-const hmrHost = process.env.VITE_HMR_HOST;
-const hmrPort = process.env.VITE_HMR_PORT ? Number(process.env.VITE_HMR_PORT) : undefined;
+import { defineConfig } from 'vite'
+import path from 'path'
+import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: true,
-    port: 5173,
-    hmr: hmrHost || hmrPort ? { host: hmrHost, port: hmrPort, clientPort: hmrPort } : undefined,
-    proxy: {
-      "/api": {
-        target: "http://api:8000",
-        changeOrigin: true
-      }
-    }
-  }
-});
+  plugins: [
+    // The React and Tailwind plugins are both required for Make, even if
+    // Tailwind is not being actively used – do not remove them
+    react(),
+    tailwindcss(),
+  ],
+  resolve: {
+    alias: {
+      // Alias @ to the src directory
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+})
