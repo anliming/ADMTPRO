@@ -456,20 +456,46 @@ export function UserManagement() {
             第 {currentPage} / {totalPages} 页
           </div>
           <div className="flex items-center gap-2">
-            {Array.from({ length: Math.min(3, totalPages) }, (_, idx) => {
-              const start = Math.max(1, Math.min(currentPage - 1, totalPages - 2));
-              const pageNumber = start + idx;
-              return (
+            {totalPages > 1 && (
+              <>
                 <Button
-                  key={pageNumber}
-                  variant={pageNumber === currentPage ? 'default' : 'outline'}
+                  variant="outline"
                   size="sm"
-                  onClick={() => setPage(pageNumber)}
+                  onClick={() => setPage(1)}
+                  disabled={currentPage === 1}
                 >
-                  {pageNumber}
+                  首页
                 </Button>
-              );
-            })}
+                {currentPage > 2 && (
+                  <span className="text-muted-foreground text-sm">…</span>
+                )}
+                {Array.from({ length: Math.min(3, totalPages) }, (_, idx) => {
+                  const start = Math.max(1, Math.min(currentPage - 1, totalPages - 2));
+                  const pageNumber = start + idx;
+                  return (
+                    <Button
+                      key={pageNumber}
+                      variant={pageNumber === currentPage ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPage(pageNumber)}
+                    >
+                      {pageNumber}
+                    </Button>
+                  );
+                })}
+                {currentPage < totalPages - 1 && (
+                  <span className="text-muted-foreground text-sm">…</span>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  末页
+                </Button>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Label>跳转</Label>
