@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
@@ -6,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/app/components/ui/input-otp';
 import { Shield, ArrowLeft, Loader2, QrCode } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { useAuth } from '@/app/contexts/AuthContext';
 
 interface AdminLoginPageProps {
@@ -21,6 +22,7 @@ export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
   const [otpToken, setOtpToken] = useState('');
   const [otpSecret, setOtpSecret] = useState('');
   const [otpUri, setOtpUri] = useState('');
+  const [otpQrDataUrl, setOtpQrDataUrl] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -82,6 +84,26 @@ export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
     setStep('otp-verify');
     setOtp('');
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    const generate = async () => {
+      if (!otpUri) {
+        setOtpQrDataUrl('');
+        return;
+      }
+      try {
+        const dataUrl = await QRCode.toDataURL(otpUri, { margin: 1, width: 220 });
+        if (!cancelled) setOtpQrDataUrl(dataUrl);
+      } catch (err) {
+        if (!cancelled) setOtpQrDataUrl('');
+      }
+    };
+    generate();
+    return () => {
+      cancelled = true;
+    };
+  }, [otpUri]);
 
   const handleRebindOtp = async () => {
     setError('');
@@ -184,9 +206,13 @@ export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
                 </AlertDescription>
               </Alert>
 
-              {/* OTP QR Code - 这里可以使用库生成二维码 */}
               <div className="border rounded-lg p-4 bg-white">
                 <div className="text-center space-y-3">
+                  {otpQrDataUrl ? (
+                    <img src={otpQrDataUrl} alt="OTP QR Code" className="mx-auto h-40 w-40" />
+                  ) : (
+                    <div className="text-xs text-muted-foreground">二维码生成中...</div>
+                  )}
                   <p className="text-sm font-medium">手动输入密钥</p>
                   <div className="bg-muted p-3 rounded font-mono text-sm break-all">
                     {otpSecret}
