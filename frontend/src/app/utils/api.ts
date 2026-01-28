@@ -328,7 +328,7 @@ export const auditApi = {
 
 export const configApi = {
   // 获取配置
-  list: () => api.get<Record<string, any>>('/config'),
+  list: () => api.get<{ items: Record<string, any>; descriptions: Record<string, string> }>('/config'),
 
   // 更新配置
   update: (key: string, value: any) =>

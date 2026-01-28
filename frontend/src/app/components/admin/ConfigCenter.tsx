@@ -15,6 +15,7 @@ type ConfigItem = {
   key: string;
   value: any;
   category: string;
+  description?: string;
 };
 
 type HistoryItem = {
@@ -61,10 +62,11 @@ export function ConfigCenter() {
     setIsLoading(true);
     try {
       const data = await configApi.list();
-      const items = Object.entries(data || {}).map(([key, value]) => ({
+      const items = Object.entries(data.items || {}).map(([key, value]) => ({
         key,
         value,
         category: categoryForKey(key),
+        description: data.descriptions?.[key],
       }));
       setConfigs(items);
       const hist = await configApi.history(50);
@@ -152,6 +154,7 @@ export function ConfigCenter() {
                       <TableRow>
                         <TableHead className="w-1/3">配置项</TableHead>
                         <TableHead className="w-1/3">值</TableHead>
+                        <TableHead>说明</TableHead>
                         <TableHead className="text-right">操作</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -163,6 +166,9 @@ export function ConfigCenter() {
                             <TableCell className="font-medium font-mono text-sm">{config.key}</TableCell>
                             <TableCell className="font-mono text-sm">
                               <Badge variant="outline">{maskIfSensitive(config.key, config.value)}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {config.description || '-'}
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
@@ -234,6 +240,12 @@ export function ConfigCenter() {
                 <Label>配置项</Label>
                 <Input value={selectedConfig.key} disabled />
               </div>
+              {selectedConfig.description && (
+                <div className="space-y-2">
+                  <Label>说明</Label>
+                  <Input value={selectedConfig.description} disabled />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="config-value">配置值</Label>
                 <Input

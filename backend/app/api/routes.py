@@ -962,7 +962,28 @@ def config_get():
         "PASSWORD_EXPIRY_CHECK_INTERVAL": current_app.config["PASSWORD_EXPIRY_CHECK_INTERVAL"],
     }
     data.update(overrides)
-    return jsonify(data)
+    descriptions = {
+        "APP_NAME": "系统名称",
+        "APP_LOGO_URL": "Logo 图片 URL",
+        "APP_FAVICON_URL": "浏览器图标 URL",
+        "APP_LOGIN_BANNER": "登录页横幅/背景图 URL",
+        "APP_PRIMARY_COLOR": "主色（HEX）",
+        "APP_SECONDARY_COLOR": "次色（HEX）",
+        "APP_SUPPORT_EMAIL": "支持邮箱",
+        "APP_SUPPORT_PHONE": "支持电话",
+        "APP_FOOTER_TEXT": "页脚文案",
+        "APP_COPYRIGHT": "版权信息",
+        "LDAP_URL": "LDAP/AD 连接地址",
+        "LDAP_BASE_DN": "LDAP Base DN",
+        "ADMIN_GROUP_DN": "管理员组 DN",
+        "OTP_ISSUER": "OTP 发行者名称",
+        "SMS_SEND_INTERVAL": "短信发送间隔(秒)",
+        "SMS_CODE_TTL": "短信验证码有效期(秒)",
+        "PASSWORD_EXPIRY_ENABLE": "是否启用密码到期提醒",
+        "PASSWORD_EXPIRY_DAYS": "密码到期提醒天数(逗号分隔)",
+        "PASSWORD_EXPIRY_CHECK_INTERVAL": "密码到期检查间隔(秒)",
+    }
+    return jsonify({"items": data, "descriptions": descriptions})
 
 
 @api_bp.put("/config")

@@ -14,7 +14,11 @@ interface AdminLoginPageProps {
 }
 
 export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
-  const { adminLogin, verifyOtp, setupOtp } = useAuth();
+  const { adminLogin, verifyOtp, setupOtp, appConfig } = useAuth();
+  const logoUrl = appConfig.APP_LOGO_URL || '';
+  const appName = appConfig.APP_NAME || 'ADMTPRO';
+  const loginBanner = appConfig.APP_LOGIN_BANNER || '';
+  const primaryColor = appConfig.APP_PRIMARY_COLOR || '#6d28d9';
   const [step, setStep] = useState<'credentials' | 'otp-setup' | 'otp-verify'>('credentials');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -125,13 +129,20 @@ export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-100 p-4">
+    <div
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-100 p-4"
+      style={loginBanner ? { backgroundImage: `url(${loginBanner})`, backgroundSize: 'cover' } : undefined}
+    >
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center">
-            <Shield className="w-8 h-8 text-white" />
-          </div>
-          <CardTitle className="text-2xl">ADMTPRO 管理员登录</CardTitle>
+          {logoUrl ? (
+            <img src={logoUrl} alt="logo" className="mx-auto h-14 w-14 object-contain" />
+          ) : (
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: primaryColor }}>
+              <Shield className="w-8 h-8 text-white" />
+            </div>
+          )}
+          <CardTitle className="text-2xl">{appName} 管理员登录</CardTitle>
           <CardDescription>
             {step === 'credentials' && '请输入管理员账号和密码'}
             {step === 'otp-setup' && '首次登录需要设置OTP二次验证'}

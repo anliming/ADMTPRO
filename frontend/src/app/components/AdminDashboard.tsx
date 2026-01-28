@@ -7,6 +7,7 @@ import { OUManagement } from '@/app/components/admin/OUManagement';
 import { AuditLogComponent } from '@/app/components/admin/AuditLog';
 import { ConfigCenter } from '@/app/components/admin/ConfigCenter';
 import { SystemHealthComponent } from '@/app/components/admin/SystemHealth';
+import { useAuth } from '@/app/contexts/AuthContext';
 
 interface AdminDashboardProps {
   username: string;
@@ -14,6 +15,9 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ username, onLogout }: AdminDashboardProps) {
+  const { appConfig } = useAuth();
+  const appName = appConfig.APP_NAME || 'ADMTPRO';
+  const logoUrl = appConfig.APP_LOGO_URL || '';
   const [activeTab, setActiveTab] = useState('users');
 
   return (
@@ -22,11 +26,15 @@ export function AdminDashboard({ username, onLogout }: AdminDashboardProps) {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
+            {logoUrl ? (
+              <img src={logoUrl} alt="logo" className="w-10 h-10 object-contain" />
+            ) : (
+              <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+            )}
             <div>
-              <h1 className="font-semibold">ADMTPRO 管理控制台</h1>
+              <h1 className="font-semibold">{appName} 管理控制台</h1>
               <p className="text-sm text-muted-foreground">管理员：{username}</p>
             </div>
           </div>

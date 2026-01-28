@@ -16,7 +16,9 @@ interface UserDashboardProps {
 }
 
 export function UserDashboard({ username, onLogout }: UserDashboardProps) {
-  const { user } = useAuth();
+  const { user, appConfig } = useAuth();
+  const appName = appConfig.APP_NAME || 'ADMTPRO';
+  const logoUrl = appConfig.APP_LOGO_URL || '';
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -111,11 +113,15 @@ export function UserDashboard({ username, onLogout }: UserDashboardProps) {
       <header className="bg-white border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-              <User className="w-6 h-6 text-white" />
-            </div>
+            {logoUrl ? (
+              <img src={logoUrl} alt="logo" className="w-10 h-10 object-contain" />
+            ) : (
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                <User className="w-6 h-6 text-white" />
+              </div>
+            )}
             <div>
-              <h1 className="font-semibold">ADMTPRO 用户中心</h1>
+              <h1 className="font-semibold">{appName} 用户中心</h1>
               <p className="text-sm text-muted-foreground">欢迎回来，{username}</p>
             </div>
           </div>

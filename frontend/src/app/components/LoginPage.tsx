@@ -12,7 +12,11 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onNavigateToForgotPassword }: LoginPageProps) {
-  const { login } = useAuth();
+  const { login, appConfig } = useAuth();
+  const logoUrl = appConfig.APP_LOGO_URL || '';
+  const appName = appConfig.APP_NAME || 'ADMTPRO';
+  const loginBanner = appConfig.APP_LOGIN_BANNER || '';
+  const primaryColor = appConfig.APP_PRIMARY_COLOR || '#2563eb';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -38,13 +42,20 @@ export function LoginPage({ onNavigateToForgotPassword }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4"
+      style={loginBanner ? { backgroundImage: `url(${loginBanner})`, backgroundSize: 'cover' } : undefined}
+    >
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
-            <User className="w-8 h-8 text-white" />
-          </div>
-          <CardTitle className="text-2xl">ADMTPRO 用户登录</CardTitle>
+          {logoUrl ? (
+            <img src={logoUrl} alt="logo" className="mx-auto h-14 w-14 object-contain" />
+          ) : (
+            <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: primaryColor }}>
+              <User className="w-8 h-8 text-white" />
+            </div>
+          )}
+          <CardTitle className="text-2xl">{appName} 用户登录</CardTitle>
           <CardDescription>请输入您的账号和密码登录系统</CardDescription>
         </CardHeader>
         <CardContent>

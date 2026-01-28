@@ -6,6 +6,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLoading: boolean;
+  appConfig: Record<string, any>;
   login: (username: string, password: string) => Promise<void>;
   adminLogin: (username: string, password: string) => Promise<{ requiresOtp: boolean; otpToken?: string; otpSetupRequired?: boolean }>;
   verifyOtp: (otpToken: string, code: string) => Promise<void>;
@@ -20,10 +21,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [appConfig, setAppConfig] = useState<Record<string, any>>({});
 
   // 初始化时检查token并加载用户信息
   useEffect(() => {
     const initAuth = async () => {
+      try {
+        const configRes = await fetch('/api/config');
+        if (configRes.ok) {
+          const payload = await configRes.json();
+          const items = payload.items || payload;
+          setAppConfig(items || {});
+        }
+      } catch (error) {
+        console.error('Failed to load app config:', error);
+      }
       const token = TokenManager.getToken();
       if (token) {
         try {
@@ -118,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isAdmin,
         isLoading,
+        appConfig,
         login,
         adminLogin,
         verifyOtp,
