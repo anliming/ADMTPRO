@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote
 
+import logging
 import requests
 
 
@@ -38,6 +39,7 @@ def send_sms(
     template_code: str,
     template_param: dict[str, Any],
 ) -> dict[str, Any]:
+    logger = logging.getLogger(__name__)
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     params = {
         "Action": "SendSms",
@@ -58,6 +60,8 @@ def send_sms(
     canonicalized_query = _canonicalized_query(params)
     signature = _sign(access_key_secret, canonicalized_query)
     url = f"{ALIYUN_ENDPOINT}?{canonicalized_query}&Signature={_percent_encode(signature)}"
+    logger.info("ALIYUN_SMS_HTTP_REQUEST endpoint=%s", ALIYUN_ENDPOINT)
     resp = requests.get(url, timeout=10)
+    logger.info("ALIYUN_SMS_HTTP_STATUS status=%s", resp.status_code)
     resp.raise_for_status()
     return resp.json()

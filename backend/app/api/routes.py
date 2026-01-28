@@ -241,6 +241,7 @@ def send_sms_code():
     payload = request.get_json(silent=True) or {}
     username = payload.get("username", "").strip()
     scene = payload.get("scene", "").strip()
+    current_app.logger.info("SMS_SEND_REQUEST user=%s scene=%s env=%s", username, scene, current_app.config["APP_ENV"])
     if not username or scene not in {"forgot", "change"}:
         return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
     if scene == "change":
@@ -255,6 +256,7 @@ def send_sms_code():
     phone = (info or {}).get("mobile") or ""
     if not phone:
         return jsonify({"code": "OBJECT_NOT_FOUND", "message": "手机号不存在"}), 404
+    masked_phone = f"{phone[:3]}****{phone[-4:]}" if len(phone) >= 7 else "***"
     if not can_send(current_app.config["DB_URL"], username, scene, current_app.config["SMS_SEND_INTERVAL"]):
         return jsonify({"code": "RATE_LIMITED", "message": "发送过于频繁"}), 429
     code = create_code(
@@ -276,8 +278,18 @@ def send_sms_code():
                 template,
             ]
         ):
+            current_app.logger.error(
+                "SMS_SEND_CONFIG_MISSING user=%s scene=%s phone=%s", username, scene, masked_phone
+            )
             return jsonify({"code": "CONFIG_ERROR", "message": "短信配置不完整"}), 500
         try:
+            current_app.logger.info(
+                "SMS_SEND_ATTEMPT user=%s scene=%s phone=%s template=%s",
+                username,
+                scene,
+                masked_phone,
+                template,
+            )
             send_via_aliyun(
                 access_key_id=current_app.config["ALIYUN_ACCESS_KEY_ID"],
                 access_key_secret=current_app.config["ALIYUN_ACCESS_KEY_SECRET"],
@@ -288,10 +300,16 @@ def send_sms_code():
             )
             mark_sent(current_app.config["DB_URL"], username, scene, code)
         except Exception as exc:
+            current_app.logger.exception(
+                "SMS_SEND_FAILED user=%s scene=%s phone=%s error=%s", username, scene, masked_phone, str(exc)
+            )
             mark_failed(current_app.config["DB_URL"], username, scene, code, str(exc))
             _audit(actor_info, "SMS_SEND", username, "error", str(exc))
             return jsonify({"code": "SMS_ERROR", "message": "短信发送失败"}), 502
     else:
+        current_app.logger.info(
+            "SMS_SEND_SKIPPED_ENV user=%s scene=%s phone=%s", username, scene, masked_phone
+        )
         mark_sent(current_app.config["DB_URL"], username, scene, code)
     _audit(actor_info, "SMS_SEND", username, "ok", scene)
     resp = {"status": "ok"}

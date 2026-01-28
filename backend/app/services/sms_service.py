@@ -1,3 +1,4 @@
+import logging
 import random
 from datetime import datetime, timedelta, timezone
 
@@ -162,6 +163,14 @@ def send_via_aliyun(
     phone: str,
     template_param: dict,
 ) -> None:
+    logger = logging.getLogger(__name__)
+    masked_phone = f"{phone[:3]}****{phone[-4:]}" if len(phone) >= 7 else "***"
+    logger.info(
+        "ALIYUN_SMS_SEND sign=%s template=%s phone=%s",
+        sign_name,
+        template_code,
+        masked_phone,
+    )
     resp = send_sms(
         access_key_id=access_key_id,
         access_key_secret=access_key_secret,
@@ -169,6 +178,12 @@ def send_via_aliyun(
         sign_name=sign_name,
         template_code=template_code,
         template_param=template_param,
+    )
+    logger.info(
+        "ALIYUN_SMS_RESPONSE code=%s message=%s requestId=%s",
+        resp.get("Code"),
+        resp.get("Message"),
+        resp.get("RequestId"),
     )
     if resp.get("Code") != "OK":
         raise RuntimeError(resp.get("Message", "SMS send failed"))
