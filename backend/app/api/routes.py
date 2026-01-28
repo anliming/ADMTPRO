@@ -951,6 +951,7 @@ def config_get():
         "APP_SUPPORT_PHONE": current_app.config.get("APP_SUPPORT_PHONE", ""),
         "APP_FOOTER_TEXT": current_app.config.get("APP_FOOTER_TEXT", ""),
         "APP_COPYRIGHT": current_app.config.get("APP_COPYRIGHT", ""),
+        "APP_FOOTER_ENABLED": current_app.config.get("APP_FOOTER_ENABLED", True),
         "LDAP_URL": current_app.config["LDAP_URL"],
         "LDAP_BASE_DN": current_app.config["LDAP_BASE_DN"],
         "ADMIN_GROUP_DN": current_app.config["ADMIN_GROUP_DN"],
@@ -973,6 +974,7 @@ def config_get():
         "APP_SUPPORT_PHONE": "支持电话",
         "APP_FOOTER_TEXT": "页脚文案",
         "APP_COPYRIGHT": "版权信息",
+        "APP_FOOTER_ENABLED": "是否显示页脚",
         "LDAP_URL": "LDAP/AD 连接地址",
         "LDAP_BASE_DN": "LDAP Base DN",
         "ADMIN_GROUP_DN": "管理员组 DN",
@@ -999,6 +1001,7 @@ def public_config_get():
         "APP_SUPPORT_PHONE": current_app.config.get("APP_SUPPORT_PHONE", ""),
         "APP_FOOTER_TEXT": current_app.config.get("APP_FOOTER_TEXT", ""),
         "APP_COPYRIGHT": current_app.config.get("APP_COPYRIGHT", ""),
+        "APP_FOOTER_ENABLED": current_app.config.get("APP_FOOTER_ENABLED", True),
     }
     overrides = get_config(current_app.config["DB_URL"])
     for key in list(data.keys()):

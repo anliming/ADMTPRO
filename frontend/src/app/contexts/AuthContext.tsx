@@ -32,6 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const payload = await configRes.json();
           const items = payload.items || payload;
           setAppConfig(items || {});
+          if (items?.APP_NAME) {
+            document.title = String(items.APP_NAME);
+          }
         }
       } catch (error) {
         console.error('Failed to load app config:', error);

@@ -5,6 +5,7 @@ import { AdminLoginPage } from '@/app/components/AdminLoginPage';
 import { ForgotPassword } from '@/app/components/ForgotPassword';
 import { UserDashboard } from '@/app/components/UserDashboard';
 import { AdminDashboard } from '@/app/components/AdminDashboard';
+import { Footer } from '@/app/components/Footer';
 import { useEffect, useState } from 'react';
 
 type Page = 'user-login' | 'admin-login' | 'forgot-password';
@@ -70,23 +71,34 @@ function AppContent() {
   if (isAuthenticated) {
     if (isAdmin) {
       return (
-        <AdminDashboard
-          username={user?.displayName || user?.sAMAccountName || '管理员'}
-          onLogout={logout}
-        />
+        <div className="min-h-screen flex flex-col">
+          <div className="flex-1">
+            <AdminDashboard
+              username={user?.displayName || user?.sAMAccountName || '管理员'}
+              onLogout={logout}
+            />
+          </div>
+          <Footer />
+        </div>
       );
     }
     return (
-      <UserDashboard
-        username={user?.displayName || user?.sAMAccountName || '用户'}
-        onLogout={logout}
-      />
+      <div className="min-h-screen flex flex-col">
+        <div className="flex-1">
+          <UserDashboard
+            username={user?.displayName || user?.sAMAccountName || '用户'}
+            onLogout={logout}
+          />
+        </div>
+        <Footer />
+      </div>
     );
   }
 
   // 未登录状态 - 显示登录页面
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
+      <div className="flex-1">
       {currentPage === 'user-login' && (
         <LoginPage
           onNavigateToForgotPassword={() => navigate('forgot-password')}
@@ -104,7 +116,9 @@ function AppContent() {
           onBack={() => navigate('user-login')}
         />
       )}
-    </>
+      </div>
+      <Footer />
+    </div>
   );
 }
 

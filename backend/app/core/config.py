@@ -27,6 +27,7 @@ def load_config() -> dict:
         "APP_SUPPORT_PHONE": os.getenv("APP_SUPPORT_PHONE", ""),
         "APP_FOOTER_TEXT": os.getenv("APP_FOOTER_TEXT", ""),
         "APP_COPYRIGHT": os.getenv("APP_COPYRIGHT", ""),
+        "APP_FOOTER_ENABLED": os.getenv("APP_FOOTER_ENABLED", "true").lower() == "true",
         "API_HOST": os.getenv("API_HOST", "0.0.0.0"),
         "API_PORT": _get_int("API_PORT", 8000),
         "SESSION_TTL": _get_int("SESSION_TTL", 1800),
@@ -71,7 +72,7 @@ def _to_bool(value) -> bool:
 
 def apply_overrides(config: dict, overrides: dict) -> dict:
     for key, value in overrides.items():
-        if key in {"PASSWORD_EXPIRY_ENABLE", "SMS_AUTO_RETRY"}:
+        if key in {"PASSWORD_EXPIRY_ENABLE", "SMS_AUTO_RETRY", "APP_FOOTER_ENABLED"}:
             config[key] = _to_bool(value)
         elif key in {
             "SMS_SEND_INTERVAL",
