@@ -481,6 +481,20 @@ def list_users():
     q = request.args.get("q", "").strip()
     ou = request.args.get("ou", "").strip()
     status = request.args.get("status", "").strip().lower()
+    page = request.args.get("page", "1").strip()
+    page_size = request.args.get("pageSize", "15").strip()
+    try:
+        page_i = max(int(page), 1)
+    except ValueError:
+        page_i = 1
+    try:
+        page_size_i = int(page_size)
+    except ValueError:
+        page_size_i = 15
+    if page_size_i <= 0:
+        page_size_i = 15
+    if page_size_i > 200:
+        page_size_i = 200
     enabled = None
     if status == "enabled":
         enabled = True
@@ -488,7 +502,11 @@ def list_users():
         enabled = False
     ldap_client = _ldap_client()
     users = ldap_client.search_users(query=q, ou_dn=ou, enabled=enabled)
-    return jsonify({"items": users})
+    total = len(users)
+    start = (page_i - 1) * page_size_i
+    end = start + page_size_i
+    items = users[start:end]
+    return jsonify({"items": items, "total": total, "page": page_i, "pageSize": page_size_i})
 
 
 @api_bp.post("/users")

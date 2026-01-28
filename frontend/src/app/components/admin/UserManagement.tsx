@@ -34,6 +34,7 @@ export function UserManagement() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [pageSize, setPageSize] = useState(15);
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [showAddUser, setShowAddUser] = useState(false);
   const [showEditUser, setShowEditUser] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ViewUser | null>(null);
@@ -63,7 +64,10 @@ export function UserManagement() {
     setIsLoading(true);
     setError('');
     try {
-      const params: { q?: string; ou?: string; status?: string } = {};
+      const params: { q?: string; ou?: string; status?: string; page?: number; pageSize?: number } = {
+        page,
+        pageSize,
+      };
       if (searchTerm.trim()) params.q = searchTerm.trim();
       if (filterOU !== 'all' && filterOU) params.ou = filterOU;
       if (filterStatus === 'active') params.status = 'enabled';
@@ -82,7 +86,7 @@ export function UserManagement() {
             : undefined,
       }));
       setUsers(items);
-      setPage(1);
+      setTotal(res.total || 0);
     } catch (err: any) {
       setError(err.message || '加载用户失败');
     } finally {
@@ -92,12 +96,19 @@ export function UserManagement() {
 
   useEffect(() => {
     loadOus();
-    loadUsers();
   }, []);
 
   useEffect(() => {
-    setPage(1);
+    if (page !== 1) {
+      setPage(1);
+    } else {
+      loadUsers();
+    }
   }, [searchTerm, filterOU, filterStatus, pageSize]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [page]);
 
   const ouOptions = useMemo(() => {
     return ous.map((o) => ({
@@ -106,12 +117,9 @@ export function UserManagement() {
     }));
   }, [ous]);
 
-  const totalPages = Math.max(1, Math.ceil(users.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pagedUsers = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return users.slice(start, start + pageSize);
-  }, [users, currentPage, pageSize]);
+  const pagedUsers = useMemo(() => users, [users]);
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -430,7 +438,7 @@ export function UserManagement() {
 
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          共 {users.length} 条
+          共 {total} 条
         </div>
         <div className="flex items-center gap-3">
           <Label>每页</Label>

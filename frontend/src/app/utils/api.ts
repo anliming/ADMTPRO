@@ -247,8 +247,8 @@ export const authApi = {
 
 export const userApi = {
   // 查询用户
-  list: (params?: { q?: string; ou?: string; status?: string }) =>
-    api.get<{ items: User[] }>('/users', params),
+  list: (params?: { q?: string; ou?: string; status?: string; page?: number; pageSize?: number }) =>
+    api.get<{ items: User[]; total: number; page: number; pageSize: number }>('/users', params),
 
   // 创建用户
   create: (data: {
