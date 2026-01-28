@@ -25,6 +25,7 @@ type HistoryItem = {
 };
 
 const categoryForKey = (key: string): string => {
+  if (key.startsWith('APP_')) return '系统';
   if (key.startsWith('LDAP_') || key.startsWith('ADMIN_')) return 'LDAP';
   if (key.startsWith('OTP_')) return 'OTP';
   if (key.startsWith('SMS_') || key.startsWith('ALIYUN_') || key.startsWith('SMTP_')) return '短信/邮件';

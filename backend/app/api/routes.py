@@ -941,6 +941,16 @@ def config_get():
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
     overrides = get_config(current_app.config["DB_URL"])
     data = {
+        "APP_NAME": current_app.config.get("APP_NAME", "ADMTPRO"),
+        "APP_LOGO_URL": current_app.config.get("APP_LOGO_URL", ""),
+        "APP_FAVICON_URL": current_app.config.get("APP_FAVICON_URL", ""),
+        "APP_LOGIN_BANNER": current_app.config.get("APP_LOGIN_BANNER", ""),
+        "APP_PRIMARY_COLOR": current_app.config.get("APP_PRIMARY_COLOR", "#4F46E5"),
+        "APP_SECONDARY_COLOR": current_app.config.get("APP_SECONDARY_COLOR", "#F59E0B"),
+        "APP_SUPPORT_EMAIL": current_app.config.get("APP_SUPPORT_EMAIL", ""),
+        "APP_SUPPORT_PHONE": current_app.config.get("APP_SUPPORT_PHONE", ""),
+        "APP_FOOTER_TEXT": current_app.config.get("APP_FOOTER_TEXT", ""),
+        "APP_COPYRIGHT": current_app.config.get("APP_COPYRIGHT", ""),
         "LDAP_URL": current_app.config["LDAP_URL"],
         "LDAP_BASE_DN": current_app.config["LDAP_BASE_DN"],
         "ADMIN_GROUP_DN": current_app.config["ADMIN_GROUP_DN"],
