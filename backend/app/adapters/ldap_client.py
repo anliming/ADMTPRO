@@ -91,7 +91,8 @@ class LDAPClient:
     def search_users(self, query: str = "", ou_dn: str = "", enabled: Optional[bool] = None) -> list[dict]:
         conn = self._service_conn()
         base = ou_dn or self.base_dn
-        filter_parts = ["(objectClass=user)"]
+        # Only return person user objects; exclude computer/builtin accounts.
+        filter_parts = ["(objectClass=user)", "(objectClass=person)", "(!(objectClass=computer))"]
         if query:
             q = query.replace("*", "")
             filter_parts.append(
