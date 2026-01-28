@@ -83,6 +83,25 @@ export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
     setOtp('');
   };
 
+  const handleRebindOtp = async () => {
+    setError('');
+    if (!otpToken) {
+      setError('请先完成账号密码验证');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const otpSetupData = await setupOtp(otpToken);
+      setOtpSecret(otpSetupData.secret);
+      setOtpUri(otpSetupData.otpauth_uri);
+      setStep('otp-setup');
+    } catch (err: any) {
+      setError(err.message || 'OTP 绑定失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-100 p-4">
       <Card className="w-full max-w-md">
@@ -251,6 +270,16 @@ export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
                 ) : (
                   '验证并登录'
                 )}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleRebindOtp}
+                disabled={isLoading}
+              >
+                无法验证？重新绑定 OTP
               </Button>
 
               <Button

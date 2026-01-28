@@ -212,7 +212,7 @@ def otp_setup():
         return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
 
     data = verify_token(current_app.config["APP_SECRET"], otp_token, OTP_TOKEN_TTL)
-    if not data or data.get("type") != "otp" or data.get("mode") != "setup":
+    if not data or data.get("type") != "otp" or data.get("mode") not in {"setup", "verify"}:
         return jsonify({"code": "AUTH_INVALID", "message": "验证码无效或已过期"}), 401
 
     username = data.get("username", "")
