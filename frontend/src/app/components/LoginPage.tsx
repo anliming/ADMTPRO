@@ -55,7 +55,7 @@ export function LoginPage({ onNavigateToForgotPassword }: LoginPageProps) {
               <User className="w-8 h-8 text-white" />
             </div>
           )}
-          <CardTitle className="text-2xl">{appName} 用户登录</CardTitle>
+          <CardTitle className="text-2xl text-center">{appName}</CardTitle>
           <CardDescription>请输入您的账号和密码登录系统</CardDescription>
         </CardHeader>
         <CardContent>

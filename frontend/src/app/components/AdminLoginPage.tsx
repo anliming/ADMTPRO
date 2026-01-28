@@ -142,7 +142,7 @@ export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
               <Shield className="w-8 h-8 text-white" />
             </div>
           )}
-          <CardTitle className="text-2xl">{appName} 管理员登录</CardTitle>
+          <CardTitle className="text-2xl text-center">{appName}</CardTitle>
           <CardDescription>
             {step === 'credentials' && '请输入管理员账号和密码'}
             {step === 'otp-setup' && '首次登录需要设置OTP二次验证'}
