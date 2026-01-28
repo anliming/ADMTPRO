@@ -132,7 +132,7 @@ def login():
     if role_hint == "admin" and not is_admin:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
 
-    if is_admin:
+    if role_hint == "admin" and is_admin:
         otp_record = get_secret(current_app.config["DB_URL"], username)
         if not otp_record:
             otp_token = issue_token(
