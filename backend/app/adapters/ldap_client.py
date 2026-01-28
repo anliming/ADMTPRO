@@ -106,10 +106,17 @@ class LDAPClient:
         conn.search(
             base,
             search_filter,
-            attributes=["sAMAccountName", "displayName", "mail", "mobile", "department", "title"],
+            attributes=["sAMAccountName", "displayName", "mail", "mobile", "department", "title", "userAccountControl"],
         )
         users = []
         for entry in conn.entries:
+            uac = getattr(entry, "userAccountControl", None)
+            uac_value = uac.value if uac else 0
+            enabled_flag = True
+            try:
+                enabled_flag = not (int(uac_value) & 2)
+            except Exception:
+                enabled_flag = True
             users.append(
                 {
                     "dn": str(entry.entry_dn),
@@ -119,6 +126,7 @@ class LDAPClient:
                     "mobile": getattr(entry, "mobile", None).value,
                     "department": getattr(entry, "department", None).value,
                     "title": getattr(entry, "title", None).value,
+                    "enabled": enabled_flag,
                 }
             )
         return users

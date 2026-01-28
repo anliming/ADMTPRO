@@ -456,6 +456,22 @@ export function UserManagement() {
             第 {currentPage} / {totalPages} 页
           </div>
           <div className="flex items-center gap-2">
+            {Array.from({ length: Math.min(3, totalPages) }, (_, idx) => {
+              const start = Math.max(1, Math.min(currentPage - 1, totalPages - 2));
+              const pageNumber = start + idx;
+              return (
+                <Button
+                  key={pageNumber}
+                  variant={pageNumber === currentPage ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPage(pageNumber)}
+                >
+                  {pageNumber}
+                </Button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2">
             <Label>跳转</Label>
             <Input
               value={String(currentPage)}
