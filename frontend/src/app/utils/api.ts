@@ -328,11 +328,11 @@ export const auditApi = {
 
 export const configApi = {
   // 获取配置
-  list: () => api.get<{ items: Config[] }>('/config'),
+  list: () => api.get<Record<string, any>>('/config'),
 
   // 更新配置
   update: (key: string, value: any) =>
-    api.put<{ status: string }>('/config', { key, value }),
+    api.put<{ status: string }>('/config', { [key]: value }),
 
   // 配置历史
   history: (limit?: number) =>

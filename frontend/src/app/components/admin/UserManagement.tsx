@@ -1,25 +1,40 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/app/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Badge } from '@/app/components/ui/badge';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { Switch } from '@/app/components/ui/switch';
-import { UserPlus, Search, Edit, Trash2, Key, Upload, Download, CheckCircle } from 'lucide-react';
-import { mockUsers, mockOUs, type User } from '@/app/utils/mockData';
+import { UserPlus, Search, Edit, Trash2, Key, Download, RefreshCw } from 'lucide-react';
+import { userApi, ouApi, type User, type OU } from '@/app/utils/api';
 import { toast } from 'sonner';
 
+type ViewUser = User & {
+  ouDn?: string;
+  enabled?: boolean;
+};
+
+const getOuDnFromDn = (dn?: string): string => {
+  if (!dn) return '';
+  const parts = dn.split(',');
+  parts.shift();
+  return parts.join(',');
+};
+
 export function UserManagement() {
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [users, setUsers] = useState<ViewUser[]>([]);
+  const [ous, setOus] = useState<OU[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOU, setFilterOU] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showAddUser, setShowAddUser] = useState(false);
   const [showEditUser, setShowEditUser] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<ViewUser | null>(null);
   const [formData, setFormData] = useState({
     username: '',
     name: '',
@@ -28,111 +43,196 @@ export function UserManagement() {
     department: '',
     position: '',
     ou: '',
+    password: '',
     mustChangePassword: true,
   });
+  const [selectedUserOu, setSelectedUserOu] = useState('');
 
-  // Filter users
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phone.includes(searchTerm) ||
-      user.department.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesOU = filterOU === 'all' || user.ou === filterOU;
-    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
-
-    return matchesSearch && matchesOU && matchesStatus;
-  });
-
-  const handleAddUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newUser: User = {
-      id: String(users.length + 1),
-      ...formData,
-      status: 'active',
-      passwordExpiry: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      createdAt: new Date().toISOString().split('T')[0],
-      lastLogin: '-',
-    };
-    setUsers([...users, newUser]);
-    setShowAddUser(false);
-    setFormData({
-      username: '',
-      name: '',
-      email: '',
-      phone: '',
-      department: '',
-      position: '',
-      ou: '',
-      mustChangePassword: true,
-    });
-    toast.success('用户创建成功');
-  };
-
-  const handleEditUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedUser) return;
-    
-    setUsers(users.map(u => u.id === selectedUser.id ? { ...u, ...formData } : u));
-    setShowEditUser(false);
-    setSelectedUser(null);
-    toast.success('用户信息已更新');
-  };
-
-  const handleToggleStatus = (userId: string) => {
-    setUsers(users.map(u => 
-      u.id === userId 
-        ? { ...u, status: u.status === 'active' ? 'disabled' : 'active' as 'active' | 'disabled' }
-        : u
-    ));
-    toast.success('用户状态已更新');
-  };
-
-  const handleResetPassword = (user: User) => {
-    setUsers(users.map(u => 
-      u.id === user.id 
-        ? { ...u, mustChangePassword: true }
-        : u
-    ));
-    toast.success(`已重置 ${user.name} 的密码`);
-  };
-
-  const handleDeleteUser = (userId: string) => {
-    if (confirm('确定要删除此用户吗？')) {
-      setUsers(users.filter(u => u.id !== userId));
-      toast.success('用户已删除');
+  const loadOus = async () => {
+    try {
+      const res = await ouApi.list();
+      setOus(res.items || []);
+    } catch (err: any) {
+      console.error(err);
     }
   };
 
-  const handleExport = () => {
-    const csv = [
-      ['用户名', '姓名', '邮箱', '手机号', '部门', '岗位', 'OU', '状态'].join(','),
-      ...filteredUsers.map(u => [
-        u.username, u.name, u.email, u.phone, u.department, u.position, u.ou, u.status
-      ].join(','))
-    ].join('\n');
-    
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'users.csv';
-    link.click();
-    toast.success('导出成功');
+  const loadUsers = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const params: { q?: string; ou?: string; status?: string } = {};
+      if (searchTerm.trim()) params.q = searchTerm.trim();
+      if (filterOU !== 'all' && filterOU) params.ou = filterOU;
+      if (filterStatus === 'active') params.status = 'enabled';
+      if (filterStatus === 'disabled') params.status = 'disabled';
+      const res = await userApi.list(params);
+      const items = (res.items || []).map((u) => ({
+        ...u,
+        ouDn: getOuDnFromDn(u.dn),
+        enabled:
+          typeof u.enabled === 'boolean'
+            ? u.enabled
+            : filterStatus === 'active'
+            ? true
+            : filterStatus === 'disabled'
+            ? false
+            : undefined,
+      }));
+      setUsers(items);
+    } catch (err: any) {
+      setError(err.message || '加载用户失败');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const openEditDialog = (user: User) => {
+  useEffect(() => {
+    loadOus();
+    loadUsers();
+  }, []);
+
+  const ouOptions = useMemo(() => {
+    return ous.map((o) => ({
+      dn: o.dn,
+      label: o.name ? `${o.name} (${o.dn})` : o.dn,
+    }));
+  }, [ous]);
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.password.trim()) {
+      setError('请填写初始密码');
+      return;
+    }
+    if (!formData.ou) {
+      setError('请选择 OU');
+      return;
+    }
+    try {
+      await userApi.create({
+        sAMAccountName: formData.username,
+        displayName: formData.name,
+        ouDn: formData.ou,
+        password: formData.password,
+        mail: formData.email,
+        mobile: formData.phone,
+        department: formData.department,
+        title: formData.position,
+        forceChangeAtFirstLogin: formData.mustChangePassword,
+      });
+      toast.success('用户创建成功');
+      setShowAddUser(false);
+      setFormData({
+        username: '',
+        name: '',
+        email: '',
+        phone: '',
+        department: '',
+        position: '',
+        ou: '',
+        password: '',
+        mustChangePassword: true,
+      });
+      await loadUsers();
+    } catch (err: any) {
+      setError(err.message || '创建用户失败');
+    }
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+
+    try {
+      await userApi.update(selectedUser.sAMAccountName, {
+        displayName: formData.name,
+        mail: formData.email,
+        mobile: formData.phone,
+        department: formData.department,
+        title: formData.position,
+      });
+
+      if (formData.ou && formData.ou !== selectedUserOu) {
+        await userApi.move(selectedUser.sAMAccountName, formData.ou);
+      }
+
+      toast.success('用户信息已更新');
+      setShowEditUser(false);
+      setSelectedUser(null);
+      await loadUsers();
+    } catch (err: any) {
+      setError(err.message || '更新失败');
+    }
+  };
+
+  const handleToggleStatus = async (user: ViewUser, enabled: boolean) => {
+    try {
+      await userApi.setStatus(user.sAMAccountName, enabled);
+      toast.success('用户状态已更新');
+      setUsers((prev) =>
+        prev.map((u) => (u.sAMAccountName === user.sAMAccountName ? { ...u, enabled } : u))
+      );
+    } catch (err: any) {
+      toast.error(err.message || '更新状态失败');
+    }
+  };
+
+  const handleResetPassword = async (user: ViewUser) => {
+    const newPassword = prompt('请输入新密码');
+    if (!newPassword) return;
+    try {
+      await userApi.resetPassword(user.sAMAccountName, newPassword, true);
+      toast.success(`已重置 ${user.displayName || user.sAMAccountName} 的密码`);
+    } catch (err: any) {
+      toast.error(err.message || '重置密码失败');
+    }
+  };
+
+  const handleDeleteUser = async (user: ViewUser) => {
+    if (!confirm('确定要删除此用户吗？')) return;
+    try {
+      await userApi.delete(user.sAMAccountName);
+      toast.success('用户已删除');
+      await loadUsers();
+    } catch (err: any) {
+      toast.error(err.message || '删除失败');
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const params: { q?: string; ou?: string; status?: string } = {};
+      if (searchTerm.trim()) params.q = searchTerm.trim();
+      if (filterOU !== 'all' && filterOU) params.ou = filterOU;
+      if (filterStatus === 'active') params.status = 'enabled';
+      if (filterStatus === 'disabled') params.status = 'disabled';
+      const csv = await userApi.export(params);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'users.csv';
+      link.click();
+      toast.success('导出成功');
+    } catch (err: any) {
+      toast.error(err.message || '导出失败');
+    }
+  };
+
+  const openEditDialog = (user: ViewUser) => {
+    const ouDn = user.ouDn || '';
     setSelectedUser(user);
+    setSelectedUserOu(ouDn);
     setFormData({
-      username: user.username,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      department: user.department,
-      position: user.position,
-      ou: user.ou,
-      mustChangePassword: user.mustChangePassword,
+      username: user.sAMAccountName,
+      name: user.displayName || '',
+      email: user.mail || '',
+      phone: user.mobile || '',
+      department: user.department || '',
+      position: user.title || '',
+      ou: ouDn,
+      password: '',
+      mustChangePassword: true,
     });
     setShowEditUser(true);
   };
@@ -150,6 +250,10 @@ export function UserManagement() {
           <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             导出
+          </Button>
+          <Button variant="outline" onClick={loadUsers} disabled={isLoading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            刷新
           </Button>
           <Button onClick={() => setShowAddUser(true)}>
             <UserPlus className="w-4 h-4 mr-2" />
@@ -182,38 +286,34 @@ export function UserManagement() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="add-email">邮箱 *</Label>
+                    <Label htmlFor="add-email">邮箱</Label>
                     <Input
                       id="add-email"
                       type="email"
-                      required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="add-phone">手机号 *</Label>
+                    <Label htmlFor="add-phone">手机号</Label>
                     <Input
                       id="add-phone"
-                      required
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="add-department">部门 *</Label>
+                    <Label htmlFor="add-department">部门</Label>
                     <Input
                       id="add-department"
-                      required
                       value={formData.department}
                       onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="add-position">岗位 *</Label>
+                    <Label htmlFor="add-position">岗位</Label>
                     <Input
                       id="add-position"
-                      required
                       value={formData.position}
                       onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                     />
@@ -222,26 +322,40 @@ export function UserManagement() {
                     <Label htmlFor="add-ou">组织单元 (OU) *</Label>
                     <Select value={formData.ou} onValueChange={(v) => setFormData({ ...formData, ou: v })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="选择OU" />
+                        <SelectValue placeholder="请选择 OU" />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockOUs.map(ou => (
-                          <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
+                        {ouOptions.map((ou) => (
+                          <SelectItem key={ou.dn} value={ou.dn}>
+                            {ou.label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2 col-span-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="add-must-change">首次登录强制改密</Label>
-                      <Switch
-                        id="add-must-change"
-                        checked={formData.mustChangePassword}
-                        onCheckedChange={(checked) => setFormData({ ...formData, mustChangePassword: checked })}
-                      />
-                    </div>
+                    <Label htmlFor="add-password">初始密码 *</Label>
+                    <Input
+                      id="add-password"
+                      type="password"
+                      required
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 col-span-2">
+                    <Switch
+                      checked={formData.mustChangePassword}
+                      onCheckedChange={(checked) => setFormData({ ...formData, mustChangePassword: checked })}
+                    />
+                    <Label>首次登录必须改密</Label>
                   </div>
                 </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setShowAddUser(false)}>
                     取消
@@ -266,13 +380,15 @@ export function UserManagement() {
           />
         </div>
         <Select value={filterOU} onValueChange={setFilterOU}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-64">
             <SelectValue placeholder="筛选OU" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全部OU</SelectItem>
-            {mockOUs.map(ou => (
-              <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
+            {ouOptions.map((ou) => (
+              <SelectItem key={ou.dn} value={ou.dn}>
+                {ou.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -286,7 +402,17 @@ export function UserManagement() {
             <SelectItem value="disabled">禁用</SelectItem>
           </SelectContent>
         </Select>
+        <Button variant="outline" onClick={loadUsers}>
+          <Search className="w-4 h-4 mr-2" />
+          查询
+        </Button>
       </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Table */}
       <div className="border rounded-lg">
@@ -301,71 +427,59 @@ export function UserManagement() {
               <TableHead>岗位</TableHead>
               <TableHead>OU</TableHead>
               <TableHead>状态</TableHead>
-              <TableHead>密码到期</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredUsers.length === 0 ? (
+            {isLoading ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  正在加载...
+                </TableCell>
+              </TableRow>
+            ) : users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   未找到用户
                 </TableCell>
               </TableRow>
             ) : (
-              filteredUsers.map(user => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.username}</TableCell>
-                  <TableCell>{user.name}</TableCell>
-                  <TableCell className="text-sm">{user.email}</TableCell>
-                  <TableCell>{user.phone}</TableCell>
+              users.map((user) => (
+                <TableRow key={user.sAMAccountName}>
+                  <TableCell className="font-medium">{user.sAMAccountName}</TableCell>
+                  <TableCell>{user.displayName}</TableCell>
+                  <TableCell className="text-sm">{user.mail}</TableCell>
+                  <TableCell>{user.mobile}</TableCell>
                   <TableCell>{user.department}</TableCell>
-                  <TableCell>{user.position}</TableCell>
+                  <TableCell>{user.title}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">
-                      {mockOUs.find(ou => ou.id === user.ou)?.name || user.ou}
-                    </Badge>
+                    <Badge variant="outline">{user.ouDn || '-'}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Switch
-                        checked={user.status === 'active'}
-                        onCheckedChange={() => handleToggleStatus(user.id)}
+                        checked={user.enabled ?? true}
+                        disabled={typeof user.enabled !== 'boolean'}
+                        onCheckedChange={(checked) => handleToggleStatus(user, checked)}
                       />
-                      <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
-                        {user.status === 'active' ? '正常' : '禁用'}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm">{user.passwordExpiry}</span>
-                      {user.mustChangePassword && (
-                        <Badge variant="destructive" className="text-xs">需改密</Badge>
+                      {typeof user.enabled === 'boolean' ? (
+                        <Badge variant={user.enabled ? 'default' : 'secondary'}>
+                          {user.enabled ? '正常' : '禁用'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">未知</Badge>
                       )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => openEditDialog(user)}
-                      >
+                      <Button size="sm" variant="ghost" onClick={() => openEditDialog(user)}>
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleResetPassword(user)}
-                      >
+                      <Button size="sm" variant="ghost" onClick={() => handleResetPassword(user)}>
                         <Key className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteUser(user)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
@@ -388,12 +502,7 @@ export function UserManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-username">用户名</Label>
-                <Input
-                  id="edit-username"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  disabled
-                />
+                <Input id="edit-username" value={formData.username} disabled />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-name">姓名</Label>
@@ -443,8 +552,10 @@ export function UserManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockOUs.map(ou => (
-                      <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
+                    {ouOptions.map((ou) => (
+                      <SelectItem key={ou.dn} value={ou.dn}>
+                        {ou.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

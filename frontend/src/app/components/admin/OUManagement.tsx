@@ -1,90 +1,133 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Textarea } from '@/app/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/app/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Badge } from '@/app/components/ui/badge';
-import { FolderPlus, Edit, Trash2, Users } from 'lucide-react';
-import { mockOUs, type OU } from '@/app/utils/mockData';
+import { FolderPlus, Edit, Trash2, RefreshCw } from 'lucide-react';
+import { ouApi, configApi, type OU } from '@/app/utils/api';
 import { toast } from 'sonner';
 
+type ViewOU = OU & { parentDn?: string };
+
+const getParentDn = (dn: string): string => {
+  const parts = dn.split(',');
+  parts.shift();
+  return parts.join(',');
+};
+
 export function OUManagement() {
-  const [ous, setOUs] = useState<OU[]>(mockOUs);
+  const [ous, setOus] = useState<ViewOU[]>([]);
+  const [baseDn, setBaseDn] = useState('');
   const [showAddOU, setShowAddOU] = useState(false);
   const [showEditOU, setShowEditOU] = useState(false);
-  const [selectedOU, setSelectedOU] = useState<OU | null>(null);
+  const [selectedOU, setSelectedOU] = useState<ViewOU | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    parentId: '',
+    parentDn: '',
     description: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleAddOU = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newOU: OU = {
-      id: `ou${ous.length + 1}`,
-      ...formData,
-      parentId: formData.parentId || null,
-      userCount: 0,
-    };
-    setOUs([...ous, newOU]);
-    setShowAddOU(false);
-    setFormData({ name: '', parentId: '', description: '' });
-    toast.success('OU创建成功');
+  const loadConfig = async () => {
+    try {
+      const cfg = await configApi.list();
+      if (cfg.LDAP_BASE_DN) setBaseDn(cfg.LDAP_BASE_DN);
+    } catch (err) {
+      // ignore
+    }
   };
 
-  const handleEditOU = (e: React.FormEvent) => {
+  const loadOus = async () => {
+    setIsLoading(true);
+    try {
+      const res = await ouApi.list();
+      const items = (res.items || []).map((o) => ({
+        ...o,
+        parentDn: getParentDn(o.dn),
+      }));
+      setOus(items);
+    } catch (err: any) {
+      toast.error(err.message || '加载OU失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConfig();
+    loadOus();
+  }, []);
+
+  const ouOptions = useMemo(() => {
+    return ous.map((o) => ({
+      dn: o.dn,
+      label: o.name ? `${o.name} (${o.dn})` : o.dn,
+    }));
+  }, [ous]);
+
+  const handleAddOU = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parentDn = formData.parentDn || baseDn;
+    if (!parentDn) {
+      toast.error('请设置父 OU 或配置 LDAP_BASE_DN');
+      return;
+    }
+    try {
+      await ouApi.create({
+        name: formData.name,
+        parentDn,
+        description: formData.description,
+      });
+      toast.success('OU 创建成功');
+      setShowAddOU(false);
+      setFormData({ name: '', parentDn: '', description: '' });
+      await loadOus();
+    } catch (err: any) {
+      toast.error(err.message || '创建OU失败');
+    }
+  };
+
+  const handleEditOU = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOU) return;
-    
-    setOUs(ous.map(ou => 
-      ou.id === selectedOU.id 
-        ? { ...ou, ...formData, parentId: formData.parentId || null }
-        : ou
-    ));
-    setShowEditOU(false);
-    setSelectedOU(null);
-    toast.success('OU信息已更新');
-  };
-
-  const handleDeleteOU = (ouId: string) => {
-    const hasChildren = ous.some(ou => ou.parentId === ouId);
-    const ou = ous.find(o => o.id === ouId);
-    
-    if (hasChildren) {
-      toast.error('无法删除：该OU下还有子OU');
-      return;
-    }
-    
-    if (ou && ou.userCount > 0) {
-      toast.error(`无法删除：该OU下还有 ${ou.userCount} 个用户`);
-      return;
-    }
-    
-    if (confirm('确定要删除此OU吗？')) {
-      setOUs(ous.filter(ou => ou.id !== ouId));
-      toast.success('OU已删除');
+    try {
+      await ouApi.update({
+        dn: selectedOU.dn,
+        name: formData.name || undefined,
+        description: formData.description || undefined,
+      });
+      toast.success('OU 信息已更新');
+      setShowEditOU(false);
+      setSelectedOU(null);
+      await loadOus();
+    } catch (err: any) {
+      toast.error(err.message || '更新OU失败');
     }
   };
 
-  const openEditDialog = (ou: OU) => {
+  const handleDeleteOU = async (ou: ViewOU) => {
+    if (!confirm('确定要删除此OU吗？')) return;
+    try {
+      await ouApi.delete(ou.dn);
+      toast.success('OU 已删除');
+      await loadOus();
+    } catch (err: any) {
+      toast.error(err.message || '删除OU失败');
+    }
+  };
+
+  const openEditDialog = (ou: ViewOU) => {
     setSelectedOU(ou);
     setFormData({
-      name: ou.name,
-      parentId: ou.parentId || '',
-      description: ou.description,
+      name: ou.name || '',
+      parentDn: ou.parentDn || '',
+      description: ou.description || '',
     });
     setShowEditOU(true);
-  };
-
-  const getOUPath = (ouId: string): string => {
-    const ou = ous.find(o => o.id === ouId);
-    if (!ou) return '';
-    if (!ou.parentId) return ou.name;
-    return `${getOUPath(ou.parentId)} / ${ou.name}`;
   };
 
   return (
@@ -96,10 +139,16 @@ export function OUManagement() {
             管理组织单元 (Organizational Unit)，共 {ous.length} 个OU
           </p>
         </div>
-        <Button onClick={() => setShowAddOU(true)}>
-          <FolderPlus className="w-4 h-4 mr-2" />
-          新增OU
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={loadOus} disabled={isLoading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            刷新
+          </Button>
+          <Button onClick={() => setShowAddOU(true)}>
+            <FolderPlus className="w-4 h-4 mr-2" />
+            新增OU
+          </Button>
+        </div>
         <Dialog open={showAddOU} onOpenChange={setShowAddOU}>
           <DialogContent>
             <DialogHeader>
@@ -119,14 +168,16 @@ export function OUManagement() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="add-parent">父OU</Label>
-                <Select value={formData.parentId} onValueChange={(v) => setFormData({ ...formData, parentId: v })}>
+                <Select value={formData.parentDn} onValueChange={(v) => setFormData({ ...formData, parentDn: v })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="无（根OU）" />
+                    <SelectValue placeholder={baseDn ? `默认根：${baseDn}` : '无（根OU）'} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">无（根OU）</SelectItem>
-                    {ous.map(ou => (
-                      <SelectItem key={ou.id} value={ou.id}>{getOUPath(ou.id)}</SelectItem>
+                    {ouOptions.map((ou) => (
+                      <SelectItem key={ou.dn} value={ou.dn}>
+                        {ou.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -152,59 +203,48 @@ export function OUManagement() {
         </Dialog>
       </div>
 
-      {/* Tree View */}
+      {/* Table */}
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>OU名称</TableHead>
-              <TableHead>完整路径</TableHead>
+              <TableHead>DN</TableHead>
               <TableHead>描述</TableHead>
-              <TableHead>用户数</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {ous.length === 0 ? (
+            {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                  正在加载...
+                </TableCell>
+              </TableRow>
+            ) : ous.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                   暂无OU
                 </TableCell>
               </TableRow>
             ) : (
-              ous.map(ou => (
-                <TableRow key={ou.id}>
+              ous.map((ou) => (
+                <TableRow key={ou.dn}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      {ou.parentId && <span className="text-muted-foreground">└─</span>}
-                      {ou.name}
-                      {!ou.parentId && <Badge variant="outline">根OU</Badge>}
+                      {ou.parentDn && <span className="text-muted-foreground">└─</span>}
+                      {ou.name || ou.dn}
+                      {!ou.parentDn && <Badge variant="outline">根OU</Badge>}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {getOUPath(ou.id)}
-                  </TableCell>
-                  <TableCell className="text-sm">{ou.description}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-muted-foreground" />
-                      <span>{ou.userCount}</span>
-                    </div>
-                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{ou.dn}</TableCell>
+                  <TableCell className="text-sm">{ou.description || '-'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => openEditDialog(ou)}
-                      >
+                      <Button size="sm" variant="ghost" onClick={() => openEditDialog(ou)}>
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteOU(ou.id)}
-                      >
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteOU(ou)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
@@ -231,22 +271,6 @@ export function OUManagement() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-parent">父OU</Label>
-              <Select value={formData.parentId} onValueChange={(v) => setFormData({ ...formData, parentId: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="无（根OU）" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">无（根OU）</SelectItem>
-                  {ous
-                    .filter(ou => ou.id !== selectedOU?.id) // 不能选择自己作为父OU
-                    .map(ou => (
-                      <SelectItem key={ou.id} value={ou.id}>{getOUPath(ou.id)}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-description">描述</Label>
