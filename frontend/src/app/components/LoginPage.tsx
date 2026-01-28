@@ -61,8 +61,8 @@ export function LoginPage({ onNavigateToForgotPassword }: LoginPageProps) {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
+              <Alert variant="destructive" className="border-0">
+                <AlertDescription className="text-base font-semibold">{error}</AlertDescription>
               </Alert>
             )}
             

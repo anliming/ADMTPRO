@@ -126,8 +126,8 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
           {step === 'identify' && (
             <form onSubmit={handleIdentify} className="space-y-4">
               {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                <Alert variant="destructive" className="border-0">
+                  <AlertDescription className="text-base font-semibold">{error}</AlertDescription>
                 </Alert>
               )}
 
@@ -154,15 +154,15 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="sms" className="space-y-2 mt-4">
-                  <Alert>
-                    <AlertDescription>
+                  <Alert className="border-0">
+                    <AlertDescription className="text-base font-semibold">
                       验证码将发送至您注册时绑定的手机号
                     </AlertDescription>
                   </Alert>
                 </TabsContent>
                 <TabsContent value="email" className="space-y-2 mt-4">
-                  <Alert>
-                    <AlertDescription>
+                  <Alert className="border-0">
+                    <AlertDescription className="text-base font-semibold">
                       验证码将发送至您注册时绑定的邮箱地址
                     </AlertDescription>
                   </Alert>
@@ -183,13 +183,13 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
           {step === 'verify' && (
             <form onSubmit={handleVerify} className="space-y-4">
               {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                <Alert variant="destructive" className="border-0">
+                  <AlertDescription className="text-base font-semibold">{error}</AlertDescription>
                 </Alert>
               )}
 
-              <Alert>
-                <AlertDescription>
+              <Alert className="border-0">
+                <AlertDescription className="text-base font-semibold">
                   验证码已发送，请查收{method === 'sms' ? '短信' : '邮件'}
                 </AlertDescription>
               </Alert>
@@ -240,8 +240,8 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
           {step === 'reset' && (
             <form onSubmit={handleReset} className="space-y-4">
               {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                <Alert variant="destructive" className="border-0">
+                  <AlertDescription className="text-base font-semibold">{error}</AlertDescription>
                 </Alert>
               )}
 
@@ -267,8 +267,8 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
                 />
               </div>
 
-              <Alert>
-                <AlertDescription>
+              <Alert className="border-0">
+                <AlertDescription className="text-base font-semibold">
                   密码要求：至少8位，包含大小写字母、数字和特殊字符
                 </AlertDescription>
               </Alert>

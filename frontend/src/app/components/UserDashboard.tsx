@@ -210,13 +210,13 @@ export function UserDashboard({ username, onLogout }: UserDashboardProps) {
                   
                   <form onSubmit={handleChangePassword} className="space-y-4">
                     {error && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
+                      <Alert variant="destructive" className="border-0">
+                        <AlertDescription className="text-base font-semibold">{error}</AlertDescription>
                       </Alert>
                     )}
                     {success && (
-                      <Alert className="border-green-200 bg-green-50">
-                        <AlertDescription className="text-green-800">{success}</AlertDescription>
+                      <Alert className="border-0 bg-green-50">
+                        <AlertDescription className="text-green-800 text-base font-semibold">{success}</AlertDescription>
                       </Alert>
                     )}
 
