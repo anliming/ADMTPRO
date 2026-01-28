@@ -49,7 +49,7 @@ volumes:
   db_data:
 
 networks:
-  app_net:
+  default:
     driver: bridge
     ipam:
       config:
