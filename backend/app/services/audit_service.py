@@ -1,5 +1,7 @@
 from typing import Optional
 
+from psycopg.types.json import Json
+
 from ..core.db import get_conn
 
 
@@ -17,6 +19,8 @@ def write_log(
     before: Optional[dict] = None,
     after: Optional[dict] = None,
 ) -> None:
+    before_json = Json(before) if before is not None else None
+    after_json = Json(after) if after is not None else None
     with get_conn(db_url) as conn:
         conn.execute(
             """
@@ -24,7 +28,7 @@ def write_log(
               (actor, actor_role, action, target, result, ip, ua, detail, before_json, after_json)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (actor, actor_role, action, target, result, ip, ua, detail, before, after),
+            (actor, actor_role, action, target, result, ip, ua, detail, before_json, after_json),
         )
 
 
