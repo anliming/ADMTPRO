@@ -130,8 +130,12 @@ export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-100 p-4"
-      style={loginBanner ? { backgroundImage: `url(${loginBanner})`, backgroundSize: 'cover' } : undefined}
+      className="min-h-screen flex items-center justify-center p-4"
+      style={
+        loginBanner
+          ? { backgroundImage: `url(${loginBanner})`, backgroundSize: 'cover' }
+          : { backgroundColor: 'var(--app-page-bg)' }
+      }
     >
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3 text-center">

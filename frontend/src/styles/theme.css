@@ -3,6 +3,8 @@
 :root {
   --app-primary: #4F46E5;
   --app-secondary: #F59E0B;
+  --app-page-bg: #EEF2FF;
+  --app-alert-bg: #FEF3C7;
   --font-size: 16px;
   --background: #ffffff;
   --foreground: oklch(0.145 0 0);
@@ -14,6 +16,7 @@
   --primary-foreground: oklch(1 0 0);
   --secondary: var(--app-secondary);
   --secondary-foreground: #ffffff;
+  --alert-background: var(--app-alert-bg);
   --muted: #ececf0;
   --muted-foreground: #717182;
   --accent: #e9ebef;

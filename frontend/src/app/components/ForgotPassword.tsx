@@ -111,7 +111,10 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-teal-100 p-4">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ backgroundColor: 'var(--app-page-bg)' }}
+    >
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3">
           <CardTitle className="text-2xl">忘记密码</CardTitle>

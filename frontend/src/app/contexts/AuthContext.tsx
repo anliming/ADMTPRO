@@ -35,6 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (items?.APP_NAME) {
             document.title = String(items.APP_NAME);
           }
+          if (items?.APP_PAGE_BG_COLOR) {
+            document.documentElement.style.setProperty('--app-page-bg', String(items.APP_PAGE_BG_COLOR));
+          }
+          if (items?.APP_ALERT_BG_COLOR) {
+            document.documentElement.style.setProperty('--app-alert-bg', String(items.APP_ALERT_BG_COLOR));
+          }
         }
       } catch (error) {
         console.error('Failed to load app config:', error);

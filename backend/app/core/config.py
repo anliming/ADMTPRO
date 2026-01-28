@@ -23,6 +23,8 @@ def load_config() -> dict:
         "APP_LOGIN_BANNER": os.getenv("APP_LOGIN_BANNER", ""),
         "APP_PRIMARY_COLOR": os.getenv("APP_PRIMARY_COLOR", "#4F46E5"),
         "APP_SECONDARY_COLOR": os.getenv("APP_SECONDARY_COLOR", "#F59E0B"),
+        "APP_PAGE_BG_COLOR": os.getenv("APP_PAGE_BG_COLOR", "#EEF2FF"),
+        "APP_ALERT_BG_COLOR": os.getenv("APP_ALERT_BG_COLOR", "#FEF3C7"),
         "APP_SUPPORT_EMAIL": os.getenv("APP_SUPPORT_EMAIL", ""),
         "APP_SUPPORT_PHONE": os.getenv("APP_SUPPORT_PHONE", ""),
         "APP_FOOTER_TEXT": os.getenv("APP_FOOTER_TEXT", ""),
