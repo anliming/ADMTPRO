@@ -986,6 +986,27 @@ def config_get():
     return jsonify({"items": data, "descriptions": descriptions})
 
 
+@api_bp.get("/public/config")
+def public_config_get():
+    data = {
+        "APP_NAME": current_app.config.get("APP_NAME", "ADMTPRO"),
+        "APP_LOGO_URL": current_app.config.get("APP_LOGO_URL", ""),
+        "APP_FAVICON_URL": current_app.config.get("APP_FAVICON_URL", ""),
+        "APP_LOGIN_BANNER": current_app.config.get("APP_LOGIN_BANNER", ""),
+        "APP_PRIMARY_COLOR": current_app.config.get("APP_PRIMARY_COLOR", "#4F46E5"),
+        "APP_SECONDARY_COLOR": current_app.config.get("APP_SECONDARY_COLOR", "#F59E0B"),
+        "APP_SUPPORT_EMAIL": current_app.config.get("APP_SUPPORT_EMAIL", ""),
+        "APP_SUPPORT_PHONE": current_app.config.get("APP_SUPPORT_PHONE", ""),
+        "APP_FOOTER_TEXT": current_app.config.get("APP_FOOTER_TEXT", ""),
+        "APP_COPYRIGHT": current_app.config.get("APP_COPYRIGHT", ""),
+    }
+    overrides = get_config(current_app.config["DB_URL"])
+    for key in list(data.keys()):
+        if key in overrides:
+            data[key] = overrides[key]
+    return jsonify({"items": data})
+
+
 @api_bp.put("/config")
 def config_set():
     if not _require_session("admin"):

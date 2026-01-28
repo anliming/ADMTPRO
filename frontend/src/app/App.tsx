@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 type Page = 'user-login' | 'admin-login' | 'forgot-password';
 
 function AppContent() {
-  const { isAuthenticated, isAdmin, isLoading, logout, user } = useAuth();
+  const { isAuthenticated, isAdmin, isLoading, logout, user, appConfig } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('user-login');
 
   const pageFromPath = (pathname: string): Page => {
@@ -44,6 +44,16 @@ function AppContent() {
     window.addEventListener('popstate', applyRoute);
     return () => window.removeEventListener('popstate', applyRoute);
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (appConfig.APP_PRIMARY_COLOR) {
+      root.style.setProperty('--app-primary', appConfig.APP_PRIMARY_COLOR);
+    }
+    if (appConfig.APP_SECONDARY_COLOR) {
+      root.style.setProperty('--app-secondary', appConfig.APP_SECONDARY_COLOR);
+    }
+  }, [appConfig]);
 
   if (isLoading) {
     return (

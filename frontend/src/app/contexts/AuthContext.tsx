@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const configRes = await fetch('/api/config');
+        const configRes = await fetch('/api/public/config');
         if (configRes.ok) {
           const payload = await configRes.json();
           const items = payload.items || payload;
