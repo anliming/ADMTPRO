@@ -820,7 +820,10 @@ def delete_ou():
         ldap_client.delete_ou(ou_dn)
     except ADConnectionError as exc:
         _audit(actor, "OU_DELETE", ou_dn, "error", str(exc))
-        return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
+        message = str(exc)
+        if "CANT_ON_NON_LEAF" in message:
+            return jsonify({"code": "AD_NON_LEAF", "message": "该 OU 下还有子对象，无法删除"}), 400
+        return jsonify({"code": "AD_ERROR", "message": message}), 500
     _audit(actor, "OU_DELETE", ou_dn, "ok")
     return jsonify({"status": "ok"})
 

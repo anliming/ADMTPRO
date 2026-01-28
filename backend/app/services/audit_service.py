@@ -2,6 +2,13 @@ from typing import Optional
 
 from psycopg.types.json import Json
 
+
+def _sanitize_text(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    # PostgreSQL TEXT cannot contain NUL bytes.
+    return value.replace("\x00", "")
+
 from ..core.db import get_conn
 
 
@@ -21,6 +28,14 @@ def write_log(
 ) -> None:
     before_json = Json(before) if before is not None else None
     after_json = Json(after) if after is not None else None
+    actor = _sanitize_text(actor) or ""
+    actor_role = _sanitize_text(actor_role) or ""
+    action = _sanitize_text(action) or ""
+    target = _sanitize_text(target) or ""
+    result = _sanitize_text(result) or ""
+    ip = _sanitize_text(ip) or ""
+    ua = _sanitize_text(ua) or ""
+    detail = _sanitize_text(detail)
     with get_conn(db_url) as conn:
         conn.execute(
             """

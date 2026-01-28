@@ -32,6 +32,8 @@ export function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOU, setFilterOU] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [pageSize, setPageSize] = useState(15);
+  const [page, setPage] = useState(1);
   const [showAddUser, setShowAddUser] = useState(false);
   const [showEditUser, setShowEditUser] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ViewUser | null>(null);
@@ -80,6 +82,7 @@ export function UserManagement() {
             : undefined,
       }));
       setUsers(items);
+      setPage(1);
     } catch (err: any) {
       setError(err.message || '加载用户失败');
     } finally {
@@ -92,12 +95,23 @@ export function UserManagement() {
     loadUsers();
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, filterOU, filterStatus, pageSize]);
+
   const ouOptions = useMemo(() => {
     return ous.map((o) => ({
       dn: o.dn,
       label: o.name ? `${o.name} (${o.dn})` : o.dn,
     }));
   }, [ous]);
+
+  const totalPages = Math.max(1, Math.ceil(users.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedUsers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return users.slice(start, start + pageSize);
+  }, [users, currentPage, pageSize]);
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,6 +428,44 @@ export function UserManagement() {
         </Alert>
       )}
 
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          共 {users.length} 条
+        </div>
+        <div className="flex items-center gap-3">
+          <Label>每页</Label>
+          <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15">15</SelectItem>
+              <SelectItem value="30">30</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="text-sm text-muted-foreground">
+            第 {currentPage} / {totalPages} 页
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage <= 1}
+          >
+            上一页
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage >= totalPages}
+          >
+            下一页
+          </Button>
+        </div>
+      </div>
+
       {/* Table */}
       <div className="border rounded-lg">
         <Table>
@@ -444,7 +496,7 @@ export function UserManagement() {
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
+              pagedUsers.map((user) => (
                 <TableRow key={user.sAMAccountName}>
                   <TableCell className="font-medium">{user.sAMAccountName}</TableCell>
                   <TableCell>{user.displayName}</TableCell>
