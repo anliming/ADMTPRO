@@ -30,6 +30,7 @@ export function UserManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [filterOU, setFilterOU] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [pageSize, setPageSize] = useState(15);
@@ -429,8 +430,19 @@ export function UserManagement() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="搜索用户名、姓名、邮箱、手机号、部门..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const next = searchInput.trim();
+                if (next === searchTerm) {
+                  loadUsers();
+                } else {
+                  setSearchTerm(next);
+                  setPage(1);
+                }
+              }
+            }}
             className="pl-10"
           />
         </div>
@@ -457,7 +469,18 @@ export function UserManagement() {
             <SelectItem value="disabled">禁用</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" onClick={loadUsers}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            const next = searchInput.trim();
+            if (next === searchTerm) {
+              loadUsers();
+            } else {
+              setSearchTerm(next);
+              setPage(1);
+            }
+          }}
+        >
           <Search className="w-4 h-4 mr-2" />
           查询
         </Button>

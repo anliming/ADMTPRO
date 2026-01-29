@@ -530,6 +530,8 @@ def list_users():
         enabled = False
     ldap_client = _ldap_client()
     users = ldap_client.search_users(query=q, ou_dn=ou, enabled=enabled)
+    if not q:
+        users = [u for u in users if (u.get("mobile") or "").strip()]
     total = len(users)
     start = (page_i - 1) * page_size_i
     end = start + page_size_i
