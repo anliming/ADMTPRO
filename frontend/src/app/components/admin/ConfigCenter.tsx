@@ -196,43 +196,32 @@ export function ConfigCenter({ externalSection }: { externalSection?: 'configs' 
         )}
 
         {activeSection === 'history' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="w-5 h-5" />
-                配置变更历史
-              </CardTitle>
-              <CardDescription>最近的配置修改记录</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {history.length === 0 ? (
-                <div className="text-sm text-muted-foreground">暂无历史记录</div>
-              ) : (
-                <div className="space-y-3">
-                  {history.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline">{categoryForKey(item.key)}</Badge>
-                        <div>
-                          <p className="text-sm font-medium">{item.key}</p>
-                          <p className="text-xs text-muted-foreground">值: {maskIfSensitive(item.key, item.value)}</p>
-                        </div>
-                      </div>
-                      <div className="text-right flex items-center gap-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground">{item.created_at}</p>
-                          <p className="text-xs text-muted-foreground">ID: {item.id}</p>
-                        </div>
-                        <Button size="sm" variant="ghost" onClick={() => handleRollback(item.id)}>
-                          <RotateCcw className="w-4 h-4" />
-                        </Button>
-                      </div>
+          <div className="space-y-3">
+            {history.length === 0 ? (
+              <div className="text-sm text-muted-foreground">暂无历史记录</div>
+            ) : (
+              history.map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline">{categoryForKey(item.key)}</Badge>
+                    <div>
+                      <p className="text-sm font-medium">{item.key}</p>
+                      <p className="text-xs text-muted-foreground">值: {maskIfSensitive(item.key, item.value)}</p>
                     </div>
-                  ))}
+                  </div>
+                  <div className="text-right flex items-center gap-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{item.created_at}</p>
+                      <p className="text-xs text-muted-foreground">ID: {item.id}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => handleRollback(item.id)}>
+                      <RotateCcw className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              ))
+            )}
+          </div>
         )}
       </div>
 
