@@ -128,36 +128,23 @@ export function ConfigCenter() {
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[220px_1fr]">
-        <div className="flex flex-col gap-3">
-          <Button
-            variant={activeSection === 'configs' ? 'default' : 'outline'}
-            onClick={() => setActiveSection('configs')}
-            className="justify-start"
-          >
-            <Settings className="w-4 h-4 mr-2" />
-            配置项
-          </Button>
-          <Button
-            variant={activeSection === 'history' ? 'default' : 'outline'}
-            onClick={() => setActiveSection('history')}
-            className="justify-start"
-          >
-            <History className="w-4 h-4 mr-2" />
-            配置变更历史
-          </Button>
-        </div>
+      <div className="space-y-6">
+        <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as 'configs' | 'history')}>
+          <TabsList className="flex w-full flex-wrap gap-2">
+            <TabsTrigger value="configs">系统配置</TabsTrigger>
+            <TabsTrigger value="history">配置变更历史</TabsTrigger>
+          </TabsList>
 
-        <div className="space-y-6">
-          {activeSection === 'configs' && categories.length > 0 && (
-            <Tabs defaultValue={categories[0]}>
-              <TabsList className="flex w-full flex-wrap gap-2">
-                {categories.map((category) => (
-                  <TabsTrigger key={category} value={category}>
-                    {category}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+          <TabsContent value="configs" className="space-y-6">
+            {categories.length > 0 && (
+              <Tabs defaultValue={categories[0]}>
+                <TabsList className="flex w-full flex-wrap gap-2">
+                  {categories.map((category) => (
+                    <TabsTrigger key={category} value={category}>
+                      {category}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
 
               {categories.map((category) => (
                 <TabsContent key={category} value={category} className="space-y-4">
@@ -206,10 +193,11 @@ export function ConfigCenter() {
                   </Card>
                 </TabsContent>
               ))}
-            </Tabs>
-          )}
+              </Tabs>
+            )}
+          </TabsContent>
 
-          {activeSection === 'history' && (
+          <TabsContent value="history">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -247,8 +235,8 @@ export function ConfigCenter() {
                 )}
               </CardContent>
             </Card>
-          )}
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Edit Dialog */}
