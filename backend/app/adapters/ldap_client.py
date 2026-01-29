@@ -338,6 +338,42 @@ class LDAPClient:
             )
         return items
 
+    def get_password_policy(self) -> dict:
+        conn = self._service_conn()
+        # Domain password policy is stored on the domain root object.
+        conn.search(
+            self.base_dn,
+            "(objectClass=domainDNS)",
+            search_scope=BASE,
+            attributes=[
+                "minPwdLength",
+                "pwdHistoryLength",
+                "maxPwdAge",
+                "minPwdAge",
+                "pwdProperties",
+                "lockoutThreshold",
+            ],
+        )
+        if not conn.entries:
+            return {}
+        entry = conn.entries[0]
+        min_len = _to_int(getattr(entry, "minPwdLength", None))
+        history_len = _to_int(getattr(entry, "pwdHistoryLength", None))
+        max_age = _interval_to_days(getattr(entry, "maxPwdAge", None))
+        min_age = _interval_to_days(getattr(entry, "minPwdAge", None))
+        pwd_props = _to_int(getattr(entry, "pwdProperties", None))
+        lockout = _to_int(getattr(entry, "lockoutThreshold", None))
+        return {
+            "min_length": min_len,
+            "history_length": history_len,
+            "max_age_days": max_age,
+            "min_age_days": min_age,
+            "pwd_properties": pwd_props,
+            "lockout_threshold": lockout,
+            "complexity_enabled": bool(pwd_props & 1) if pwd_props is not None else None,
+            "reversible_encryption": bool(pwd_props & 128) if pwd_props is not None else None,
+        }
+
     def create_ou(self, name: str, parent_dn: str, description: str = "") -> None:
         conn = self._service_conn()
         ou_dn = f"OU={name},{parent_dn}"
@@ -394,5 +430,27 @@ def _filetime_to_datetime(value) -> Optional[datetime]:
             return None
         base = datetime(1601, 1, 1, tzinfo=timezone.utc)
         return base + timedelta(microseconds=value / 10)
+    except Exception:
+        return None
+
+
+def _to_int(value) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return int(getattr(value, "value", value))
+    except Exception:
+        return None
+
+
+def _interval_to_days(value) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        raw = int(getattr(value, "value", value))
+        if raw == 0:
+            return None
+        seconds = abs(raw) / 10_000_000
+        return int(seconds // 86400)
     except Exception:
         return None

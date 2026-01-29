@@ -9,7 +9,7 @@ import { Badge } from '@/app/components/ui/badge';
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { Switch } from '@/app/components/ui/switch';
 import { UserPlus, Search, Edit, Trash2, Key, Download, RefreshCw } from 'lucide-react';
-import { userApi, ouApi, type User, type OU } from '@/app/utils/api';
+import { userApi, ouApi, passwordPolicyApi, type User, type OU } from '@/app/utils/api';
 import { toast } from 'sonner';
 
 type ViewUser = User & {
@@ -56,6 +56,29 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
   const [selectedUserOu, setSelectedUserOu] = useState('');
   const [editOuQuery, setEditOuQuery] = useState('');
   const [ouMatchHint, setOuMatchHint] = useState('');
+  const [passwordPolicy, setPasswordPolicy] = useState<{
+    min_length?: number | null;
+    history_length?: number | null;
+    max_age_days?: number | null;
+    complexity_enabled?: boolean | null;
+  }>({});
+  const passwordPolicyHint = useMemo(() => {
+    if (!passwordPolicy) return '密码长度以域策略为准';
+    const parts: string[] = [];
+    if (passwordPolicy.min_length) {
+      parts.push(`至少 ${passwordPolicy.min_length} 位`);
+    }
+    if (passwordPolicy.complexity_enabled) {
+      parts.push('需包含大小写/数字/特殊字符');
+    }
+    if (passwordPolicy.history_length) {
+      parts.push(`不能与最近 ${passwordPolicy.history_length} 次重复`);
+    }
+    if (passwordPolicy.max_age_days) {
+      parts.push(`最长有效期 ${passwordPolicy.max_age_days} 天`);
+    }
+    return parts.length ? parts.join('，') : '密码长度以域策略为准';
+  }, [passwordPolicy]);
 
   const loadOus = async () => {
     try {
@@ -63,6 +86,15 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
       setOus(res.items || []);
     } catch (err: any) {
       console.error(err);
+    }
+  };
+
+  const loadPasswordPolicy = async () => {
+    try {
+      const res = await passwordPolicyApi.get();
+      setPasswordPolicy(res.items || {});
+    } catch (err: any) {
+      // ignore
     }
   };
 
@@ -102,6 +134,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
 
   useEffect(() => {
     loadOus();
+    loadPasswordPolicy();
   }, []);
 
   useEffect(() => {
@@ -471,6 +504,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     />
+                    <div className="text-xs text-muted-foreground">{passwordPolicyHint}</div>
                   </div>
                   <div className="flex items-center gap-2 col-span-2">
                     <Switch
@@ -857,16 +891,17 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
               {resetTarget?.displayName || resetTarget?.sAMAccountName || ''} 的密码将被重置
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="reset-password">新密码</Label>
-              <Input
-                id="reset-password"
-                type="password"
-                value={resetPasswordValue}
-                onChange={(e) => setResetPasswordValue(e.target.value)}
-              />
-            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-password">新密码</Label>
+                <Input
+                  id="reset-password"
+                  type="password"
+                  value={resetPasswordValue}
+                  onChange={(e) => setResetPasswordValue(e.target.value)}
+                />
+                <div className="text-xs text-muted-foreground">{passwordPolicyHint}</div>
+              </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowResetDialog(false)}>
                 取消

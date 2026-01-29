@@ -1006,6 +1006,15 @@ def audit_logs():
     return jsonify({"items": items, "total": total, "page": page_i, "pageSize": page_size_i})
 
 
+@api_bp.get("/password-policy")
+def password_policy():
+    if not _require_session("admin"):
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    ldap_client = _ldap_client()
+    policy = ldap_client.get_password_policy()
+    return jsonify({"items": policy})
+
+
 @api_bp.get("/audit/export")
 def audit_export():
     if not _require_session("admin"):

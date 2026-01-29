@@ -387,6 +387,22 @@ export const passwordExpiryApi = {
   trigger: () => api.post<{ status: string }>('/password-expiry/trigger'),
 };
 
+export const passwordPolicyApi = {
+  get: () =>
+    api.get<{
+      items: {
+        min_length?: number | null;
+        history_length?: number | null;
+        max_age_days?: number | null;
+        min_age_days?: number | null;
+        pwd_properties?: number | null;
+        lockout_threshold?: number | null;
+        complexity_enabled?: boolean | null;
+        reversible_encryption?: boolean | null;
+      };
+    }>('/password-policy'),
+};
+
 export const smsApi = {
   // 短信日志
   list: (params?: { username?: string; scene?: string; status?: string; limit?: number }) =>
