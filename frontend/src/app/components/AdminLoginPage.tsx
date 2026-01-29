@@ -58,7 +58,12 @@ export function AdminLoginPage({ onNavigateToUser }: AdminLoginPageProps) {
         }
       }
     } catch (err: any) {
-      setError(err.message || '登录失败，请检查用户名和密码');
+      const msg = err.message || '';
+      if (msg.includes('无权限')) {
+        setError('无权限登录，请返回普通登录');
+      } else {
+        setError(msg || '登录失败，请检查用户名和密码');
+      }
     } finally {
       setIsLoading(false);
     }
