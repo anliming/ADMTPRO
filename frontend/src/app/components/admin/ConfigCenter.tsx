@@ -129,7 +129,7 @@ export function ConfigCenter() {
 
       {categories.length > 0 && (
         <Tabs defaultValue={categories[0]}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="flex w-full flex-wrap gap-2">
             {categories.map((category) => (
               <TabsTrigger key={category} value={category}>
                 {category}
