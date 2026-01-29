@@ -76,7 +76,7 @@ def _to_bool(value) -> bool:
 
 def apply_overrides(config: dict, overrides: dict) -> dict:
     for key, value in overrides.items():
-        if key in {"PASSWORD_EXPIRY_ENABLE", "SMS_AUTO_RETRY", "APP_FOOTER_ENABLED"}:
+        if key in {"PASSWORD_EXPIRY_ENABLE", "SMS_AUTO_RETRY", "APP_FOOTER_ENABLED", "LDAP_TLS_VERIFY", "LDAP_TLS_ALLOW_WEAK"}:
             config[key] = _to_bool(value)
         elif key in {
             "SMS_SEND_INTERVAL",
