@@ -82,6 +82,8 @@ ADMTPRO 是一套面向 AD 域控的管理平台，提供用户、OU、权限、
 - `SMTP_FROM`
 - `SMTP_SSL`：使用 SSL（465）
 - `SMTP_TLS`：使用 STARTTLS（587）
+- `EMAIL_RESET_SUBJECT`：邮件验证码主题（支持 {username}/{code}/{ttl}）
+- `EMAIL_RESET_TEMPLATE`：邮件验证码正文（支持 {username}/{code}/{ttl}）
 
 #### 系统配置
 - `APP_NAME`

@@ -65,6 +65,11 @@ def load_config() -> dict:
         "SMTP_FROM": os.getenv("SMTP_FROM", ""),
         "SMTP_SSL": os.getenv("SMTP_SSL", "false").lower() == "true",
         "SMTP_TLS": os.getenv("SMTP_TLS", "true").lower() == "true",
+        "EMAIL_RESET_SUBJECT": os.getenv("EMAIL_RESET_SUBJECT", "ADMTPRO 密码重置验证码"),
+        "EMAIL_RESET_TEMPLATE": os.getenv(
+            "EMAIL_RESET_TEMPLATE",
+            "您的验证码是：{code}，有效期 {ttl} 秒。",
+        ),
     }
 
 

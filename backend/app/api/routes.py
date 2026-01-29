@@ -428,6 +428,16 @@ def send_email_code():
         if current_app.config["SMTP_SSL"] and current_app.config["SMTP_TLS"]:
             current_app.logger.warning("SMTP_SSL and SMTP_TLS both enabled; SSL will take precedence.")
         try:
+            subject_template = current_app.config.get("EMAIL_RESET_SUBJECT", "ADMTPRO 密码重置验证码")
+            body_template = current_app.config.get("EMAIL_RESET_TEMPLATE", "您的验证码是：{code}，有效期 {ttl} 秒。")
+            try:
+                subject = subject_template.format(username=username, code=code, ttl=current_app.config["SMS_CODE_TTL"])
+            except Exception:
+                subject = subject_template
+            try:
+                body = body_template.format(username=username, code=code, ttl=current_app.config["SMS_CODE_TTL"])
+            except Exception:
+                body = f"您的验证码是：{code}，有效期 {current_app.config['SMS_CODE_TTL']} 秒。"
             send_email(
                 smtp_host=current_app.config["SMTP_HOST"],
                 smtp_port=current_app.config["SMTP_PORT"],
@@ -437,8 +447,8 @@ def send_email_code():
                 smtp_ssl=current_app.config["SMTP_SSL"],
                 smtp_tls=current_app.config["SMTP_TLS"],
                 to_email=email,
-                subject="ADMTPRO 密码重置验证码",
-                body=f"您的验证码是：{code}，有效期 {current_app.config['SMS_CODE_TTL']} 秒。",
+                subject=subject,
+                body=body,
             )
         except Exception as exc:
             current_app.logger.exception(
@@ -999,6 +1009,15 @@ def config_get():
         "PASSWORD_EXPIRY_ENABLE": current_app.config["PASSWORD_EXPIRY_ENABLE"],
         "PASSWORD_EXPIRY_DAYS": current_app.config["PASSWORD_EXPIRY_DAYS"],
         "PASSWORD_EXPIRY_CHECK_INTERVAL": current_app.config["PASSWORD_EXPIRY_CHECK_INTERVAL"],
+        "SMTP_HOST": current_app.config.get("SMTP_HOST", ""),
+        "SMTP_PORT": current_app.config.get("SMTP_PORT", 587),
+        "SMTP_USER": current_app.config.get("SMTP_USER", ""),
+        "SMTP_PASSWORD": current_app.config.get("SMTP_PASSWORD", ""),
+        "SMTP_FROM": current_app.config.get("SMTP_FROM", ""),
+        "SMTP_SSL": current_app.config.get("SMTP_SSL", False),
+        "SMTP_TLS": current_app.config.get("SMTP_TLS", True),
+        "EMAIL_RESET_SUBJECT": current_app.config.get("EMAIL_RESET_SUBJECT", "ADMTPRO 密码重置验证码"),
+        "EMAIL_RESET_TEMPLATE": current_app.config.get("EMAIL_RESET_TEMPLATE", "您的验证码是：{code}，有效期 {ttl} 秒。"),
     }
     data.update(overrides)
     descriptions = {
@@ -1024,6 +1043,15 @@ def config_get():
         "PASSWORD_EXPIRY_ENABLE": "是否启用密码到期提醒",
         "PASSWORD_EXPIRY_DAYS": "密码到期提醒天数(逗号分隔)",
         "PASSWORD_EXPIRY_CHECK_INTERVAL": "密码到期检查间隔(秒)",
+        "SMTP_HOST": "SMTP 服务器地址",
+        "SMTP_PORT": "SMTP 端口",
+        "SMTP_USER": "SMTP 用户名",
+        "SMTP_PASSWORD": "SMTP 密码",
+        "SMTP_FROM": "邮件发件人",
+        "SMTP_SSL": "SMTP 使用 SSL",
+        "SMTP_TLS": "SMTP 使用 STARTTLS",
+        "EMAIL_RESET_SUBJECT": "邮件重置主题（支持 {username}/{code}/{ttl}）",
+        "EMAIL_RESET_TEMPLATE": "邮件正文模板（支持 {username}/{code}/{ttl}）",
     }
     return jsonify({"items": data, "descriptions": descriptions})
 
