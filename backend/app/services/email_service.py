@@ -1,7 +1,9 @@
 import random
 import smtplib
 from datetime import datetime, timedelta, timezone
+from email.header import Header
 from email.message import EmailMessage
+from email.utils import formataddr, parseaddr
 
 from ..core.db import get_conn
 
@@ -61,8 +63,8 @@ def send_email(
 ) -> None:
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = smtp_from
-    msg["To"] = to_email
+    msg["From"] = _format_address(smtp_from, smtp_user)
+    msg["To"] = _format_address(to_email, to_email)
     msg.set_content(body)
 
     if smtp_ssl:
@@ -75,3 +77,18 @@ def send_email(
         if smtp_user and smtp_password:
             server.login(smtp_user, smtp_password)
         server.send_message(msg)
+
+
+def _format_address(value: str, fallback_email: str) -> str:
+    name, addr = parseaddr(value)
+    if not addr:
+        addr = fallback_email
+    if not addr:
+        raise ValueError("empty email address")
+    try:
+        addr.encode("ascii")
+    except UnicodeEncodeError:
+        raise ValueError("email address must be ascii")
+    if name:
+        return formataddr((str(Header(name, "utf-8")), addr))
+    return addr
