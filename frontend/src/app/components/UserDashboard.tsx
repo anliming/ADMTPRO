@@ -42,10 +42,11 @@ export function UserDashboard({ username, onLogout }: UserDashboardProps) {
   }, []);
 
   const daysUntilExpiry = useMemo(() => {
+    if (typeof user?.days_left === 'number') return user.days_left;
     if (!notifications.length) return null;
     const min = notifications.reduce((acc, item) => Math.min(acc, item.days_left), Number.MAX_SAFE_INTEGER);
     return Number.isFinite(min) ? min : null;
-  }, [notifications]);
+  }, [notifications, user?.days_left]);
 
   const handleSendSms = async () => {
     setError('');

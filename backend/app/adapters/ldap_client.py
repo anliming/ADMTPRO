@@ -68,12 +68,27 @@ class LDAPClient:
         if not conn.search(
             self.base_dn,
             search_filter,
-            attributes=["sAMAccountName", "displayName", "mail", "mobile", "department", "title", "memberOf"],
+            attributes=[
+                "sAMAccountName",
+                "displayName",
+                "mail",
+                "mobile",
+                "department",
+                "title",
+                "memberOf",
+                "msDS-UserPasswordExpiryTimeComputed",
+            ],
         ):
             return None
         if not conn.entries:
             return None
         entry = conn.entries[0]
+        expiry_raw = getattr(entry, "msDS-UserPasswordExpiryTimeComputed", None)
+        expiry_dt = _filetime_to_datetime(expiry_raw.value if expiry_raw else None)
+        days_left = None
+        if expiry_dt:
+            now = datetime.now(timezone.utc)
+            days_left = max((expiry_dt - now).days, 0)
         return {
             "sAMAccountName": getattr(entry, "sAMAccountName", None).value,
             "displayName": getattr(entry, "displayName", None).value,
@@ -82,6 +97,7 @@ class LDAPClient:
             "department": getattr(entry, "department", None).value,
             "title": getattr(entry, "title", None).value,
             "memberOf": getattr(entry, "memberOf", None).values if hasattr(entry, "memberOf") else [],
+            "days_left": days_left,
         }
 
     def is_user_admin(self, username: str, admin_group_dn: str) -> bool:
