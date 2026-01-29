@@ -9,17 +9,30 @@ from ..core.errors import ADConnectionError, ADAuthError
 
 
 class LDAPClient:
-    def __init__(self, url: str, bind_dn: str, bind_password: str, base_dn: str, ca_cert: str) -> None:
+    def __init__(
+        self,
+        url: str,
+        bind_dn: str,
+        bind_password: str,
+        base_dn: str,
+        ca_cert: str,
+        tls_verify: bool = True,
+        tls_allow_weak: bool = False,
+    ) -> None:
         self.url = url
         self.bind_dn = bind_dn
         self.bind_password = bind_password
         self.base_dn = base_dn
         self.ca_cert = ca_cert
+        self.tls_verify = tls_verify
+        self.tls_allow_weak = tls_allow_weak
 
     def _server(self) -> Server:
         tls = None
         if self.url.lower().startswith("ldaps") and self.ca_cert:
-            tls = Tls(validate=ssl.CERT_REQUIRED, ca_certs_file=self.ca_cert)
+            validate = ssl.CERT_REQUIRED if self.tls_verify else ssl.CERT_NONE
+            ciphers = "DEFAULT:@SECLEVEL=0" if self.tls_allow_weak else None
+            tls = Tls(validate=validate, ca_certs_file=self.ca_cert, ciphers=ciphers)
         return Server(self.url, get_info=ALL, tls=tls)
 
     def _service_conn(self) -> Connection:

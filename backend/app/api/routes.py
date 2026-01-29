@@ -38,6 +38,8 @@ def _ldap_client() -> LDAPClient:
         bind_password=current_app.config["LDAP_BIND_PASSWORD"],
         base_dn=current_app.config["LDAP_BASE_DN"],
         ca_cert=current_app.config["LDAP_CA_CERT"],
+        tls_verify=current_app.config.get("LDAP_TLS_VERIFY", True),
+        tls_allow_weak=current_app.config.get("LDAP_TLS_ALLOW_WEAK", False),
     )
 
 

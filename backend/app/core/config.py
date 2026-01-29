@@ -43,6 +43,8 @@ def load_config() -> dict:
         "LDAP_BIND_PASSWORD": os.getenv("LDAP_BIND_PASSWORD", ""),
         "LDAP_BASE_DN": os.getenv("LDAP_BASE_DN", ""),
         "LDAP_CA_CERT": os.getenv("LDAP_CA_CERT", ""),
+        "LDAP_TLS_VERIFY": os.getenv("LDAP_TLS_VERIFY", "true").lower() == "true",
+        "LDAP_TLS_ALLOW_WEAK": os.getenv("LDAP_TLS_ALLOW_WEAK", "false").lower() == "true",
         "ADMIN_GROUP_DN": os.getenv("ADMIN_GROUP_DN", ""),
         "OTP_ISSUER": os.getenv("OTP_ISSUER", "ADMTPRO"),
         "OTP_WINDOW": _get_int("OTP_WINDOW", 30),
