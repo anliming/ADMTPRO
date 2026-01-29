@@ -140,6 +140,7 @@ export interface User {
   days_left?: number | null;
   password_expiry_date?: string | null;
   account_expiry_date?: string | null;
+  password_never_expires?: boolean;
 }
 
 export interface OU {
@@ -333,8 +334,14 @@ export const ouApi = {
 
 export const auditApi = {
   // 审计日志查询
-  list: (params?: { actor?: string; action?: string; result?: string; limit?: number }) =>
-    api.get<{ items: AuditLog[] }>('/audit', params),
+  list: (params?: {
+    actor?: string;
+    action?: string;
+    result?: string;
+    target?: string;
+    page?: number;
+    pageSize?: number;
+  }) => api.get<{ items: AuditLog[]; total?: number; page?: number; pageSize?: number }>('/audit', params),
 
   // 导出审计日志
   export: (params?: { limit?: number }) =>

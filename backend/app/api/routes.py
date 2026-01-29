@@ -612,6 +612,8 @@ def create_user():
     for key in ["mail", "mobile", "department", "title"]:
         if payload.get(key):
             attrs[key] = payload[key]
+    if "passwordNeverExpires" in payload:
+        attrs["password_never_expires"] = bool(payload.get("passwordNeverExpires"))
     force_change = bool(payload.get("forceChangeAtFirstLogin", False))
     ldap_client = _ldap_client()
     try:
@@ -652,6 +654,8 @@ def update_user(username: str):
     for key in ["mail", "mobile", "department", "title", "displayName"]:
         if key in payload:
             changes[key] = payload[key]
+    if "passwordNeverExpires" in payload:
+        changes["password_never_expires"] = bool(payload.get("passwordNeverExpires"))
     if "accountExpiryDate" in payload:
         account_expiry = payload.get("accountExpiryDate") or ""
         if account_expiry:
@@ -975,11 +979,31 @@ def audit_logs():
     action = request.args.get("action", "").strip()
     target = request.args.get("target", "").strip()
     result = request.args.get("result", "").strip()
-    limit = int(request.args.get("limit", "100"))
-    items = list_logs(
-        current_app.config["DB_URL"], actor=actor, action=action, target=target, result=result, limit=limit
+    page = request.args.get("page", "1").strip()
+    page_size = request.args.get("pageSize", "15").strip()
+    try:
+        page_i = max(int(page), 1)
+    except ValueError:
+        page_i = 1
+    try:
+        page_size_i = int(page_size)
+    except ValueError:
+        page_size_i = 15
+    if page_size_i <= 0:
+        page_size_i = 15
+    if page_size_i > 200:
+        page_size_i = 200
+    offset = (page_i - 1) * page_size_i
+    items, total = list_logs(
+        current_app.config["DB_URL"],
+        actor=actor,
+        action=action,
+        target=target,
+        result=result,
+        limit=page_size_i,
+        offset=offset,
     )
-    return jsonify({"items": items})
+    return jsonify({"items": items, "total": total, "page": page_i, "pageSize": page_size_i})
 
 
 @api_bp.get("/audit/export")

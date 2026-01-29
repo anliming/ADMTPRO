@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 from psycopg.types.json import Json
 
@@ -55,7 +55,8 @@ def list_logs(
     target: str = "",
     result: str = "",
     limit: int = 100,
-) -> list[dict]:
+    offset: int = 0,
+) -> Tuple[list[dict], int]:
     where = []
     params = []
     if actor:
@@ -72,17 +73,18 @@ def list_logs(
         params.append(result)
 
     clause = "WHERE " + " AND ".join(where) if where else ""
+    count_sql = f"SELECT COUNT(*) FROM audit_logs {clause}"
     sql = (
         "SELECT id, actor, actor_role, action, target, result, ip, ua, detail, before_json, after_json, created_at "
         "FROM audit_logs "
         f"{clause} "
         "ORDER BY created_at DESC "
-        "LIMIT %s"
+        "LIMIT %s OFFSET %s"
     )
-    params.append(limit)
 
     with get_conn(db_url) as conn:
-        rows = conn.execute(sql, params).fetchall()
+        total = conn.execute(count_sql, params).fetchone()[0]
+        rows = conn.execute(sql, params + [limit, offset]).fetchall()
     items = []
     for row in rows:
         items.append(
@@ -101,4 +103,4 @@ def list_logs(
                 "created_at": row[11].isoformat(),
             }
         )
-    return items
+    return items, total

@@ -77,6 +77,7 @@ class LDAPClient:
                 "title",
                 "memberOf",
                 "msDS-UserPasswordExpiryTimeComputed",
+                "userAccountControl",
                 "accountExpires",
             ],
         ):
@@ -95,6 +96,13 @@ class LDAPClient:
         account_raw = getattr(entry, "accountExpires", None)
         account_dt = _filetime_to_datetime(account_raw.value if account_raw else None)
         account_expiry_date = account_dt.date().isoformat() if account_dt else None
+        uac = getattr(entry, "userAccountControl", None)
+        uac_value = uac.value if uac else 0
+        pwd_never_expires = False
+        try:
+            pwd_never_expires = bool(int(uac_value) & 0x10000)
+        except Exception:
+            pwd_never_expires = False
         return {
             "sAMAccountName": getattr(entry, "sAMAccountName", None).value,
             "displayName": getattr(entry, "displayName", None).value,
@@ -106,6 +114,7 @@ class LDAPClient:
             "days_left": days_left,
             "password_expiry_date": expiry_date,
             "account_expiry_date": account_expiry_date,
+            "password_never_expires": pwd_never_expires,
         }
 
     def is_user_admin(self, username: str, admin_group_dn: str) -> bool:
@@ -165,6 +174,11 @@ class LDAPClient:
                 enabled_flag = not (int(uac_value) & 2)
             except Exception:
                 enabled_flag = True
+            pwd_never_expires = False
+            try:
+                pwd_never_expires = bool(int(uac_value) & 0x10000)
+            except Exception:
+                pwd_never_expires = False
             expiry_raw = getattr(entry, "msDS-UserPasswordExpiryTimeComputed", None)
             expiry_dt = _filetime_to_datetime(expiry_raw.value if expiry_raw else None)
             password_expiry_date = expiry_dt.date().isoformat() if expiry_dt else None
@@ -187,6 +201,7 @@ class LDAPClient:
                     "days_left": days_left,
                     "password_expiry_date": password_expiry_date,
                     "account_expiry_date": account_expiry_date,
+                    "password_never_expires": pwd_never_expires,
                 }
             )
         return users
@@ -210,6 +225,9 @@ class LDAPClient:
             "userPrincipalName": user_principal,
             "objectClass": ["top", "person", "organizationalPerson", "user"],
         }
+        if attributes.get("password_never_expires") is not None:
+            attrs["userAccountControl"] = 512 | 0x10000 if attributes["password_never_expires"] else 512
+            attributes = {k: v for k, v in attributes.items() if k != "password_never_expires"}
         attrs.update(attributes)
         if not conn.add(user_dn, attributes=attrs):
             raise ADConnectionError(conn.result.get("message", "add failed"))
@@ -220,6 +238,20 @@ class LDAPClient:
 
     def update_user(self, user_dn: str, changes: dict) -> None:
         conn = self._service_conn()
+        if "password_never_expires" in changes:
+            current_uac = 512
+            conn.search(user_dn, "(objectClass=*)", attributes=["userAccountControl"])
+            if conn.entries:
+                current_uac = getattr(conn.entries[0], "userAccountControl", None).value or 512
+            try:
+                current_uac = int(current_uac)
+            except Exception:
+                current_uac = 512
+            if changes["password_never_expires"]:
+                changes["userAccountControl"] = current_uac | 0x10000
+            else:
+                changes["userAccountControl"] = current_uac & ~0x10000
+            changes.pop("password_never_expires", None)
         mod = {k: [(MODIFY_REPLACE, [v])] for k, v in changes.items()}
         if not conn.modify(user_dn, mod):
             raise ADConnectionError(conn.result.get("message", "modify failed"))

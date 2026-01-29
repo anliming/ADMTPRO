@@ -19,12 +19,23 @@ export function AuditLogComponent() {
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
+  const [total, setTotal] = useState(0);
 
   const loadLogs = async () => {
     setIsLoading(true);
     try {
-      const params: { actor?: string; action?: string; result?: string; target?: string; limit?: number } = {
-        limit: 100,
+      const params: {
+        actor?: string;
+        action?: string;
+        result?: string;
+        target?: string;
+        page?: number;
+        pageSize?: number;
+      } = {
+        page,
+        pageSize,
       };
       if (actor.trim()) params.actor = actor.trim();
       if (target.trim()) params.target = target.trim();
@@ -33,6 +44,7 @@ export function AuditLogComponent() {
       if (filterResult === 'failed') params.result = 'error';
       const res = await auditApi.list(params);
       setLogs(res.items || []);
+      setTotal(res.total || 0);
     } catch (err: any) {
       toast.error(err.message || '加载审计日志失败');
     } finally {
@@ -42,7 +54,15 @@ export function AuditLogComponent() {
 
   useEffect(() => {
     loadLogs();
-  }, []);
+  }, [page, pageSize]);
+
+  useEffect(() => {
+    if (page !== 1) {
+      setPage(1);
+    } else {
+      loadLogs();
+    }
+  }, [actor, target, filterAction, filterResult]);
 
   const uniqueActions = useMemo(() => Array.from(new Set(logs.map((log) => log.action))), [logs]);
 
@@ -71,7 +91,7 @@ export function AuditLogComponent() {
         <div>
           <h2 className="text-2xl font-semibold">审计日志</h2>
           <p className="text-sm text-muted-foreground mt-1">查看系统操作记录</p>
-          <p className="text-sm text-muted-foreground">共 {logs.length} 条日志</p>
+          <p className="text-sm text-muted-foreground">共 {total} 条日志</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={loadLogs} disabled={isLoading}>
@@ -126,10 +146,74 @@ export function AuditLogComponent() {
             <SelectItem value="failed">失败</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" onClick={loadLogs}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setPage(1);
+            loadLogs();
+          }}
+        >
           <Search className="w-4 h-4 mr-2" />
           查询
         </Button>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">共 {total} 条</div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">每页</span>
+          <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15">15</SelectItem>
+              <SelectItem value="30">30</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="text-sm text-muted-foreground">
+            第 {Math.min(page, Math.max(1, Math.ceil(total / pageSize)))} /{' '}
+            {Math.max(1, Math.ceil(total / pageSize))} 页
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+            >
+              首页
+            </Button>
+            {page > 2 && <span className="text-muted-foreground text-sm">…</span>}
+            {Array.from({ length: Math.min(3, Math.max(1, Math.ceil(total / pageSize))) }, (_, idx) => {
+              const totalPages = Math.max(1, Math.ceil(total / pageSize));
+              const start = Math.max(1, Math.min(page - 1, totalPages - 2));
+              const pageNumber = start + idx;
+              return (
+                <Button
+                  key={pageNumber}
+                  variant={pageNumber === page ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPage(pageNumber)}
+                >
+                  {pageNumber}
+                </Button>
+              );
+            })}
+            {page < Math.max(1, Math.ceil(total / pageSize)) - 1 && (
+              <span className="text-muted-foreground text-sm">…</span>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, Math.ceil(total / pageSize)))}
+              disabled={page === Math.max(1, Math.ceil(total / pageSize))}
+            >
+              末页
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Table */}

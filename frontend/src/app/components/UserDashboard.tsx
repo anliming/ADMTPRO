@@ -16,7 +16,7 @@ interface UserDashboardProps {
 }
 
 export function UserDashboard({ username, onLogout }: UserDashboardProps) {
-  const { user, appConfig } = useAuth();
+  const { user, appConfig, refreshUser } = useAuth();
   const appName = appConfig.APP_NAME || 'ADMTPRO';
   const logoUrl = appConfig.APP_LOGO_URL || '';
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -94,6 +94,7 @@ export function UserDashboard({ username, onLogout }: UserDashboardProps) {
 
     try {
       await authApi.changePassword(oldPassword, newPassword, smsCode);
+      await refreshUser();
       setSuccess('密码修改成功！');
       setOldPassword('');
       setNewPassword('');

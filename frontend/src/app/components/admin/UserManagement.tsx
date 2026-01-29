@@ -49,6 +49,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
     ou: '',
     accountExpiryDate: '',
     passwordExpiryDate: '',
+    passwordNeverExpires: false,
     password: '',
     mustChangePassword: true,
   });
@@ -190,6 +191,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
           department: formData.department,
           title: formData.position,
           forceChangeAtFirstLogin: formData.mustChangePassword,
+          passwordNeverExpires: formData.passwordNeverExpires,
         }),
       );
       toast.success('用户创建成功');
@@ -204,6 +206,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
         ou: '',
         accountExpiryDate: '',
         passwordExpiryDate: '',
+        passwordNeverExpires: false,
         password: '',
         mustChangePassword: true,
       });
@@ -226,6 +229,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
           department: formData.department,
           title: formData.position,
           accountExpiryDate: formData.accountExpiryDate || '',
+          passwordNeverExpires: formData.passwordNeverExpires,
         }),
       );
 
@@ -274,6 +278,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
       setShowResetDialog(false);
       setResetTarget(null);
       setResetPasswordValue('');
+      await loadUsers();
     } catch (err: any) {
       toast.error(err.message || '重置密码失败');
     }
@@ -331,6 +336,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
       ou: ouDn,
       accountExpiryDate: user.account_expiry_date || '',
       passwordExpiryDate: user.password_expiry_date || '',
+      passwordNeverExpires: !!user.password_never_expires,
       password: '',
       mustChangePassword: true,
     });
@@ -448,6 +454,13 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
                       onCheckedChange={(checked) => setFormData({ ...formData, mustChangePassword: checked })}
                     />
                     <Label>首次登录必须改密</Label>
+                  </div>
+                  <div className="flex items-center gap-2 col-span-2">
+                    <Switch
+                      checked={formData.passwordNeverExpires}
+                      onCheckedChange={(checked) => setFormData({ ...formData, passwordNeverExpires: checked })}
+                    />
+                    <Label>密码永不过期</Label>
                   </div>
                 </div>
                 {error && (
@@ -770,6 +783,13 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
               <div className="space-y-2">
                 <Label htmlFor="edit-password-expiry">密码到期时间</Label>
                 <Input id="edit-password-expiry" type="date" value={formData.passwordExpiryDate} disabled />
+              </div>
+              <div className="flex items-center gap-2 col-span-2">
+                <Switch
+                  checked={formData.passwordNeverExpires}
+                  onCheckedChange={(checked) => setFormData({ ...formData, passwordNeverExpires: checked })}
+                />
+                <Label>密码永不过期</Label>
               </div>
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="edit-ou">组织单元 (OU)</Label>
