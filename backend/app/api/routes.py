@@ -4,7 +4,14 @@ from flask import Blueprint, current_app, jsonify, request
 
 from ..adapters.ldap_client import LDAPClient
 from ..core.auth import issue_token, verify_token
-from ..services.otp_service import create_secret, enable_secret, get_secret, verify_code
+from ..services.otp_service import (
+    create_secret,
+    enable_secret,
+    get_secret,
+    verify_code,
+    has_valid_action_otp,
+    record_action_otp,
+)
 from ..services.audit_service import list_logs, write_log
 from ..services.audit_export import export_csv
 from ..services.sms_service import (
@@ -31,6 +38,13 @@ from ..core.errors import ADConnectionError
 api_bp = Blueprint("api", __name__)
 
 OTP_TOKEN_TTL = 300
+
+
+def _require_admin_action_otp(actor: dict) -> bool:
+    ttl_minutes = current_app.config.get("OTP_ACTION_TTL_MINUTES", 10)
+    if ttl_minutes <= 0:
+        return True
+    return has_valid_action_otp(current_app.config["DB_URL"], actor.get("username", ""))
 
 
 def _date_to_filetime(date_str: str) -> int:
@@ -207,6 +221,25 @@ def otp_verify():
         current_app.config["APP_SECRET"], {"type": "session", "username": username, "role": "admin"}
     )
     return jsonify({"token": session_token})
+
+
+@api_bp.post("/auth/otp/verify-action")
+def otp_verify_action():
+    actor = _require_session("admin")
+    if not actor:
+        return jsonify({"code": "AUTH_REQUIRED", "message": "未登录"}), 401
+    payload = request.get_json(silent=True) or {}
+    code = payload.get("code", "")
+    if not code:
+        return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+    username = actor.get("username", "")
+    otp_record = get_secret(current_app.config["DB_URL"], username)
+    if not otp_record:
+        return jsonify({"code": "AUTH_INVALID", "message": "验证码无效或已过期"}), 401
+    if not verify_code(otp_record["secret"], code, current_app.config["OTP_WINDOW"]):
+        return jsonify({"code": "AUTH_INVALID", "message": "验证码无效或已过期"}), 401
+    record_action_otp(current_app.config["DB_URL"], username, current_app.config["OTP_ACTION_TTL_MINUTES"])
+    return jsonify({"status": "ok"})
 
 
 @api_bp.post("/auth/logout")
@@ -569,6 +602,8 @@ def create_user():
     actor = _require_session("admin")
     if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     required = ["sAMAccountName", "displayName", "ouDn", "password"]
     if any(not payload.get(k) for k in required):
@@ -610,6 +645,8 @@ def update_user(username: str):
     actor = _require_session("admin")
     if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     changes = {}
     for key in ["mail", "mobile", "department", "title", "displayName"]:
@@ -646,6 +683,8 @@ def set_user_status(username: str):
     actor = _require_session("admin")
     if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     if "enabled" not in payload:
         return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
@@ -674,6 +713,8 @@ def reset_password(username: str):
     actor = _require_session("admin")
     if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     new_password = payload.get("newPassword", "")
     force_change = bool(payload.get("forceChangeAtFirstLogin", False))
@@ -722,8 +763,11 @@ def export_users():
 
 @api_bp.post("/users/import")
 def import_users():
-    if not _require_session("admin"):
+    actor = _require_session("admin")
+    if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     csv_text = payload.get("csv", "")
     if not csv_text:
@@ -758,8 +802,11 @@ def import_users():
 
 @api_bp.post("/users/batch")
 def batch_users():
-    if not _require_session("admin"):
+    actor = _require_session("admin")
+    if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     action = payload.get("action", "")
     usernames = payload.get("usernames", [])
@@ -794,6 +841,8 @@ def delete_user(username: str):
     actor = _require_session("admin")
     if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     ldap_client = _ldap_client()
     user_dn = ldap_client.get_user_dn(username)
     if not user_dn:
@@ -813,6 +862,8 @@ def move_user(username: str):
     actor = _require_session("admin")
     if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     target_ou = payload.get("targetOuDn", "")
     if not target_ou:
@@ -851,6 +902,8 @@ def create_ou():
     actor = _require_session("admin")
     if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     name = payload.get("name", "")
     parent_dn = payload.get("parentDn", "")
@@ -872,6 +925,8 @@ def update_ou():
     actor = _require_session("admin")
     if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     ou_dn = payload.get("dn", "")
     name = payload.get("name")
@@ -893,6 +948,8 @@ def delete_ou():
     actor = _require_session("admin")
     if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     ou_dn = payload.get("dn", "")
     if not ou_dn:
@@ -1004,6 +1061,7 @@ def config_get():
         "LDAP_BASE_DN": current_app.config["LDAP_BASE_DN"],
         "ADMIN_GROUP_DN": current_app.config["ADMIN_GROUP_DN"],
         "OTP_ISSUER": current_app.config["OTP_ISSUER"],
+        "OTP_ACTION_TTL_MINUTES": current_app.config.get("OTP_ACTION_TTL_MINUTES", 10),
         "SMS_SEND_INTERVAL": current_app.config["SMS_SEND_INTERVAL"],
         "SMS_CODE_TTL": current_app.config["SMS_CODE_TTL"],
         "PASSWORD_EXPIRY_ENABLE": current_app.config["PASSWORD_EXPIRY_ENABLE"],
@@ -1038,6 +1096,7 @@ def config_get():
         "LDAP_BASE_DN": "LDAP Base DN",
         "ADMIN_GROUP_DN": "管理员组 DN",
         "OTP_ISSUER": "OTP 发行者名称",
+        "OTP_ACTION_TTL_MINUTES": "管理员高危操作OTP有效期(分钟)",
         "SMS_SEND_INTERVAL": "短信发送间隔(秒)",
         "SMS_CODE_TTL": "短信验证码有效期(秒)",
         "PASSWORD_EXPIRY_ENABLE": "是否启用密码到期提醒",
@@ -1082,8 +1141,11 @@ def public_config_get():
 
 @api_bp.put("/config")
 def config_set():
-    if not _require_session("admin"):
+    actor = _require_session("admin")
+    if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     for key, value in payload.items():
         set_config(current_app.config["DB_URL"], key, value)
@@ -1124,8 +1186,11 @@ def config_history():
 
 @api_bp.post("/config/rollback")
 def config_rollback():
-    if not _require_session("admin"):
+    actor = _require_session("admin")
+    if not actor:
         return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    if not _require_admin_action_otp(actor):
+        return jsonify({"code": "OTP_REQUIRED", "message": "需要OTP验证"}), 403
     payload = request.get_json(silent=True) or {}
     history_id = int(payload.get("id", 0))
     if history_id <= 0:

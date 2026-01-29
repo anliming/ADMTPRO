@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/app/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
+import { Label } from '@/app/components/ui/label';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/app/components/ui/input-otp';
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +28,7 @@ import { AuditLogComponent } from '@/app/components/admin/AuditLog';
 import { ConfigCenter } from '@/app/components/admin/ConfigCenter';
 import { SystemHealthComponent } from '@/app/components/admin/SystemHealth';
 import { useAuth } from '@/app/contexts/AuthContext';
+import { authApi } from '@/app/utils/api';
 
 interface AdminDashboardProps {
   username: string;
@@ -37,6 +41,11 @@ export function AdminDashboard({ username, onLogout }: AdminDashboardProps) {
   const logoUrl = appConfig.APP_LOGO_URL || '';
   const [activeTab, setActiveTab] = useState('users');
   const [configSection, setConfigSection] = useState<'configs' | 'history'>('configs');
+  const [otpOpen, setOtpOpen] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpPending, setOtpPending] = useState(false);
+  const otpResolver = useState<{ resolve?: () => void; reject?: (err?: any) => void }>({})[0];
   const navItems = [
     {
       key: 'users',
@@ -69,6 +78,47 @@ export function AdminDashboard({ username, onLogout }: AdminDashboardProps) {
       children: ['运行状态'],
     },
   ];
+
+  const requireActionOtp = () =>
+    new Promise<void>((resolve, reject) => {
+      setOtpValue('');
+      setOtpError('');
+      setOtpOpen(true);
+      otpResolver.resolve = resolve;
+      otpResolver.reject = reject;
+    });
+
+  const handleOtpConfirm = async () => {
+    if (otpValue.trim().length !== 6) {
+      setOtpError('请输入6位OTP验证码');
+      return;
+    }
+    setOtpPending(true);
+    try {
+      await authApi.otpVerifyAction(otpValue.trim());
+      setOtpOpen(false);
+      setOtpValue('');
+      setOtpError('');
+      const resolve = otpResolver.resolve;
+      otpResolver.resolve = undefined;
+      otpResolver.reject = undefined;
+      resolve?.();
+    } catch (err: any) {
+      setOtpError(err.message || 'OTP 验证失败');
+    } finally {
+      setOtpPending(false);
+    }
+  };
+
+  const handleOtpCancel = () => {
+    setOtpOpen(false);
+    setOtpValue('');
+    setOtpError('');
+    const reject = otpResolver.reject;
+    otpResolver.resolve = undefined;
+    otpResolver.reject = undefined;
+    reject?.(new Error('OTP cancelled'));
+  };
 
   return (
     <SidebarProvider>
@@ -156,13 +206,54 @@ export function AdminDashboard({ username, onLogout }: AdminDashboardProps) {
             </div>
           </header>
           <div className="px-4 py-6">
-            {activeTab === 'users' && <UserManagement />}
-            {activeTab === 'ou' && <OUManagement />}
+            {activeTab === 'users' && <UserManagement onRequireOtp={requireActionOtp} />}
+            {activeTab === 'ou' && <OUManagement onRequireOtp={requireActionOtp} />}
             {activeTab === 'audit' && <AuditLogComponent />}
-            {activeTab === 'config' && <ConfigCenter externalSection={configSection} />}
+            {activeTab === 'config' && (
+              <ConfigCenter externalSection={configSection} onRequireOtp={requireActionOtp} />
+            )}
             {activeTab === 'health' && <SystemHealthComponent />}
           </div>
         </SidebarInset>
+        <Dialog
+          open={otpOpen}
+          onOpenChange={(open) => {
+            if (!open && !otpPending) {
+              handleOtpCancel();
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>OTP 验证</DialogTitle>
+              <DialogDescription>高危操作需要进行二次验证</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>OTP 验证码</Label>
+                <InputOTP maxLength={6} value={otpValue} onChange={setOtpValue} disabled={otpPending}>
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+                {otpError && <p className="text-sm text-destructive">{otpError}</p>}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={handleOtpCancel} disabled={otpPending}>
+                  取消
+                </Button>
+                <Button type="button" onClick={handleOtpConfirm} disabled={otpPending}>
+                  确认验证
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </SidebarProvider>
   );

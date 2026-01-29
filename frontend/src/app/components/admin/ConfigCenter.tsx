@@ -52,7 +52,13 @@ const parseValue = (input: string) => {
   return input;
 };
 
-export function ConfigCenter({ externalSection }: { externalSection?: 'configs' | 'history' }) {
+export function ConfigCenter({
+  externalSection,
+  onRequireOtp,
+}: {
+  externalSection?: 'configs' | 'history';
+  onRequireOtp?: () => Promise<void>;
+}) {
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [activeSection, setActiveSection] = useState<'configs' | 'history'>('configs');
@@ -99,10 +105,22 @@ export function ConfigCenter({ externalSection }: { externalSection?: 'configs' 
     setShowEdit(true);
   };
 
+  const withOtpRetry = async <T,>(action: () => Promise<T>): Promise<T> => {
+    try {
+      return await action();
+    } catch (err: any) {
+      if (err?.code === 'OTP_REQUIRED' && onRequireOtp) {
+        await onRequireOtp();
+        return await action();
+      }
+      throw err;
+    }
+  };
+
   const handleSave = async () => {
     if (!selectedConfig) return;
     try {
-      await configApi.update(selectedConfig.key, parseValue(editValue));
+      await withOtpRetry(() => configApi.update(selectedConfig.key, parseValue(editValue)));
       toast.success('配置已更新');
       setShowEdit(false);
       await loadConfigs();
@@ -114,7 +132,7 @@ export function ConfigCenter({ externalSection }: { externalSection?: 'configs' 
   const handleRollback = async (id: number) => {
     if (!confirm('确定要回滚该配置吗？')) return;
     try {
-      await configApi.rollback(id);
+      await withOtpRetry(() => configApi.rollback(id));
       toast.success('回滚成功');
       await loadConfigs();
     } catch (err: any) {

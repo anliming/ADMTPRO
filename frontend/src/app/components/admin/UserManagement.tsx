@@ -24,7 +24,7 @@ const getOuDnFromDn = (dn?: string): string => {
   return parts.join(',');
 };
 
-export function UserManagement() {
+export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<void> }) {
   const [users, setUsers] = useState<ViewUser[]>([]);
   const [ous, setOus] = useState<OU[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -150,6 +150,24 @@ export function UserManagement() {
   const currentPage = Math.min(page, totalPages);
   const pagedUsers = useMemo(() => users, [users]);
 
+  const withOtpRetry = async <T,>(action: () => Promise<T>): Promise<T> => {
+    try {
+      return await action();
+    } catch (err: any) {
+      if (err?.code === 'OTP_REQUIRED' && onRequireOtp) {
+        await onRequireOtp();
+        return await action();
+      }
+      throw err;
+    }
+  };
+
+  const [resetTarget, setResetTarget] = useState<ViewUser | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ViewUser | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.password.trim()) {
@@ -161,17 +179,19 @@ export function UserManagement() {
       return;
     }
     try {
-      await userApi.create({
-        sAMAccountName: formData.username,
-        displayName: formData.name,
-        ouDn: formData.ou,
-        password: formData.password,
-        mail: formData.email,
-        mobile: formData.phone,
-        department: formData.department,
-        title: formData.position,
-        forceChangeAtFirstLogin: formData.mustChangePassword,
-      });
+      await withOtpRetry(() =>
+        userApi.create({
+          sAMAccountName: formData.username,
+          displayName: formData.name,
+          ouDn: formData.ou,
+          password: formData.password,
+          mail: formData.email,
+          mobile: formData.phone,
+          department: formData.department,
+          title: formData.position,
+          forceChangeAtFirstLogin: formData.mustChangePassword,
+        }),
+      );
       toast.success('用户创建成功');
       setShowAddUser(false);
       setFormData({
@@ -198,17 +218,19 @@ export function UserManagement() {
     if (!selectedUser) return;
 
     try {
-      await userApi.update(selectedUser.sAMAccountName, {
-        displayName: formData.name,
-        mail: formData.email,
-        mobile: formData.phone,
-        department: formData.department,
-        title: formData.position,
-        accountExpiryDate: formData.accountExpiryDate || '',
-      });
+      await withOtpRetry(() =>
+        userApi.update(selectedUser.sAMAccountName, {
+          displayName: formData.name,
+          mail: formData.email,
+          mobile: formData.phone,
+          department: formData.department,
+          title: formData.position,
+          accountExpiryDate: formData.accountExpiryDate || '',
+        }),
+      );
 
       if (formData.ou && formData.ou !== selectedUserOu) {
-        await userApi.move(selectedUser.sAMAccountName, formData.ou);
+        await withOtpRetry(() => userApi.move(selectedUser.sAMAccountName, formData.ou));
       }
 
       toast.success('用户信息已更新');
@@ -222,7 +244,7 @@ export function UserManagement() {
 
   const handleToggleStatus = async (user: ViewUser, enabled: boolean) => {
     try {
-      await userApi.setStatus(user.sAMAccountName, enabled);
+      await withOtpRetry(() => userApi.setStatus(user.sAMAccountName, enabled));
       toast.success('用户状态已更新');
       setUsers((prev) =>
         prev.map((u) => (u.sAMAccountName === user.sAMAccountName ? { ...u, enabled } : u))
@@ -233,21 +255,42 @@ export function UserManagement() {
   };
 
   const handleResetPassword = async (user: ViewUser) => {
-    const newPassword = prompt('请输入新密码');
-    if (!newPassword) return;
+    setResetTarget(user);
+    setResetPasswordValue('');
+    setShowResetDialog(true);
+  };
+
+  const confirmResetPassword = async () => {
+    if (!resetTarget) return;
+    if (!resetPasswordValue.trim()) {
+      toast.error('请输入新密码');
+      return;
+    }
     try {
-      await userApi.resetPassword(user.sAMAccountName, newPassword, true);
-      toast.success(`已重置 ${user.displayName || user.sAMAccountName} 的密码`);
+      await withOtpRetry(() =>
+        userApi.resetPassword(resetTarget.sAMAccountName, resetPasswordValue, true),
+      );
+      toast.success(`已重置 ${resetTarget.displayName || resetTarget.sAMAccountName} 的密码`);
+      setShowResetDialog(false);
+      setResetTarget(null);
+      setResetPasswordValue('');
     } catch (err: any) {
       toast.error(err.message || '重置密码失败');
     }
   };
 
   const handleDeleteUser = async (user: ViewUser) => {
-    if (!confirm('确定要删除此用户吗？')) return;
+    setDeleteTarget(user);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteTarget) return;
     try {
-      await userApi.delete(user.sAMAccountName);
+      await withOtpRetry(() => userApi.delete(deleteTarget.sAMAccountName));
       toast.success('用户已删除');
+      setShowDeleteDialog(false);
+      setDeleteTarget(null);
       await loadUsers();
     } catch (err: any) {
       toast.error(err.message || '删除失败');
@@ -759,6 +802,55 @@ export function UserManagement() {
               <Button type="submit">保存</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>重置密码</DialogTitle>
+            <DialogDescription>
+              {resetTarget?.displayName || resetTarget?.sAMAccountName || ''} 的密码将被重置
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-password">新密码</Label>
+              <Input
+                id="reset-password"
+                type="password"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowResetDialog(false)}>
+                取消
+              </Button>
+              <Button type="button" onClick={confirmResetPassword}>
+                确认重置
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除用户</DialogTitle>
+            <DialogDescription>
+              确认删除 {deleteTarget?.displayName || deleteTarget?.sAMAccountName || ''} 吗？
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              取消
+            </Button>
+            <Button type="button" variant="destructive" onClick={confirmDeleteUser}>
+              删除
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

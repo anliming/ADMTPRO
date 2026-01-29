@@ -42,3 +42,29 @@ def enable_secret(db_url: str, username: str) -> None:
 def verify_code(secret: str, code: str, window: int) -> bool:
     totp = pyotp.TOTP(secret, interval=window)
     return totp.verify(code, valid_window=1)
+
+
+def record_action_otp(db_url: str, username: str, ttl_minutes: int) -> None:
+    expires_at = _now() + timedelta(minutes=ttl_minutes)
+    with get_conn(db_url) as conn:
+        conn.execute(
+            """
+            INSERT INTO admin_otp_sessions (username, verified_at, expires_at)
+            VALUES (%s, NOW(), %s)
+            ON CONFLICT (username)
+            DO UPDATE SET verified_at = NOW(), expires_at = EXCLUDED.expires_at
+            """,
+            (username, expires_at),
+        )
+
+
+def has_valid_action_otp(db_url: str, username: str) -> bool:
+    with get_conn(db_url) as conn:
+        row = conn.execute(
+            "SELECT expires_at FROM admin_otp_sessions WHERE username = %s",
+            (username,),
+        ).fetchone()
+        if not row:
+            return False
+        (expires_at,) = row
+        return expires_at is not None and expires_at > _now()

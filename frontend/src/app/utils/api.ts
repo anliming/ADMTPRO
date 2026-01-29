@@ -69,7 +69,13 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
-      throw new Error(error.message || error.detail || `HTTP ${response.status}`);
+      const err = new Error(error.message || error.detail || `HTTP ${response.status}`) as Error & {
+        code?: string;
+        status?: number;
+      };
+      err.code = error.code;
+      err.status = response.status;
+      throw err;
     }
 
     // 处理空响应
@@ -206,6 +212,12 @@ export const authApi = {
   otpVerify: (otpToken: string, code: string) =>
     api.post<{ token: string }>('/auth/otp/verify', {
       otp_token: otpToken,
+      code,
+    }),
+
+  // 管理员高危操作 OTP 验证
+  otpVerifyAction: (code: string) =>
+    api.post<{ status: string }>('/auth/otp/verify-action', {
       code,
     }),
 

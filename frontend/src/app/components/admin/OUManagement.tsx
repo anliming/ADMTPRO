@@ -19,12 +19,14 @@ const getParentDn = (dn: string): string => {
   return parts.join(',');
 };
 
-export function OUManagement() {
+export function OUManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<void> }) {
   const [ous, setOus] = useState<ViewOU[]>([]);
   const [baseDn, setBaseDn] = useState('');
   const [showAddOU, setShowAddOU] = useState(false);
   const [showEditOU, setShowEditOU] = useState(false);
   const [selectedOU, setSelectedOU] = useState<ViewOU | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ViewOU | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     parentDn: '',
@@ -140,6 +142,18 @@ export function OUManagement() {
     setShowOuUsers(true);
   };
 
+  const withOtpRetry = async <T,>(action: () => Promise<T>): Promise<T> => {
+    try {
+      return await action();
+    } catch (err: any) {
+      if (err?.code === 'OTP_REQUIRED' && onRequireOtp) {
+        await onRequireOtp();
+        return await action();
+      }
+      throw err;
+    }
+  };
+
   const handleAddOU = async (e: React.FormEvent) => {
     e.preventDefault();
     const parentDn = formData.parentDn || baseDn;
@@ -148,11 +162,13 @@ export function OUManagement() {
       return;
     }
     try {
-      await ouApi.create({
-        name: formData.name,
-        parentDn,
-        description: formData.description,
-      });
+      await withOtpRetry(() =>
+        ouApi.create({
+          name: formData.name,
+          parentDn,
+          description: formData.description,
+        }),
+      );
       toast.success('OU 创建成功');
       setShowAddOU(false);
       setFormData({ name: '', parentDn: '', description: '' });
@@ -166,11 +182,13 @@ export function OUManagement() {
     e.preventDefault();
     if (!selectedOU) return;
     try {
-      await ouApi.update({
-        dn: selectedOU.dn,
-        name: formData.name || undefined,
-        description: formData.description || undefined,
-      });
+      await withOtpRetry(() =>
+        ouApi.update({
+          dn: selectedOU.dn,
+          name: formData.name || undefined,
+          description: formData.description || undefined,
+        }),
+      );
       toast.success('OU 信息已更新');
       setShowEditOU(false);
       setSelectedOU(null);
@@ -181,10 +199,17 @@ export function OUManagement() {
   };
 
   const handleDeleteOU = async (ou: ViewOU) => {
-    if (!confirm('确定要删除此OU吗？')) return;
+    setDeleteTarget(ou);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteOU = async () => {
+    if (!deleteTarget) return;
     try {
-      await ouApi.delete(ou.dn);
+      await withOtpRetry(() => ouApi.delete(deleteTarget.dn));
       toast.success('OU 已删除');
+      setShowDeleteDialog(false);
+      setDeleteTarget(null);
       await loadOus();
     } catch (err: any) {
       toast.error(err.message || '删除OU失败');
@@ -391,6 +416,25 @@ export function OUManagement() {
               <Button type="submit">保存</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除 OU</DialogTitle>
+            <DialogDescription>
+              确认删除 {deleteTarget?.name || deleteTarget?.dn || ''} 吗？
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              取消
+            </Button>
+            <Button type="button" variant="destructive" onClick={confirmDeleteOU}>
+              删除
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

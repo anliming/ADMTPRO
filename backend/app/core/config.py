@@ -48,6 +48,7 @@ def load_config() -> dict:
         "ADMIN_GROUP_DN": os.getenv("ADMIN_GROUP_DN", ""),
         "OTP_ISSUER": os.getenv("OTP_ISSUER", "ADMTPRO"),
         "OTP_WINDOW": _get_int("OTP_WINDOW", 30),
+        "OTP_ACTION_TTL_MINUTES": _get_int("OTP_ACTION_TTL_MINUTES", 10),
         "ALIYUN_ACCESS_KEY_ID": os.getenv("ALIYUN_ACCESS_KEY_ID", ""),
         "ALIYUN_ACCESS_KEY_SECRET": os.getenv("ALIYUN_ACCESS_KEY_SECRET", ""),
         "ALIYUN_SMS_SIGN_NAME": os.getenv("ALIYUN_SMS_SIGN_NAME", ""),
@@ -99,6 +100,7 @@ def apply_overrides(config: dict, overrides: dict) -> dict:
             "PASSWORD_EXPIRY_CHECK_INTERVAL",
             "LOGIN_MAX_FAILS",
             "LOGIN_LOCK_MINUTES",
+            "OTP_ACTION_TTL_MINUTES",
         }:
             try:
                 config[key] = int(value)

@@ -125,3 +125,12 @@ def init_db(db_url: str) -> None:
             );
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_otp_sessions (
+              username TEXT PRIMARY KEY,
+              verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              expires_at TIMESTAMPTZ NOT NULL
+            );
+            """
+        )
