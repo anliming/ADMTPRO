@@ -443,12 +443,18 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label htmlFor="add-ou">组织单元 (OU) *</Label>
+                    <Input
+                      placeholder="输入部门/OU 名称或 DN 过滤"
+                      value={editOuQuery}
+                      onChange={(e) => setEditOuQuery(e.target.value)}
+                    />
+                    {ouMatchHint && <div className="text-xs text-muted-foreground">{ouMatchHint}</div>}
                     <Select value={formData.ou} onValueChange={(v) => setFormData({ ...formData, ou: v })}>
                       <SelectTrigger>
                         <SelectValue placeholder="请选择 OU" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ouOptions.map((ou) => (
+                        {filteredOuOptions.map((ou) => (
                           <SelectItem key={ou.dn} value={ou.dn}>
                             {ou.label}
                           </SelectItem>
