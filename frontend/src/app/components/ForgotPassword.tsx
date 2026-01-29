@@ -159,14 +159,14 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
                 <TabsContent value="sms" className="space-y-2 mt-4">
                   <Alert className="border-0">
                     <AlertDescription className="text-base font-semibold">
-                      验证码将发送至您注册时绑定的手机号
+                      验证码将发送至您的手机号
                     </AlertDescription>
                   </Alert>
                 </TabsContent>
                 <TabsContent value="email" className="space-y-2 mt-4">
                   <Alert className="border-0">
                     <AlertDescription className="text-base font-semibold">
-                      验证码将发送至您注册时绑定的邮箱地址
+                      验证码将发送至您的邮箱地址
                     </AlertDescription>
                   </Alert>
                 </TabsContent>
