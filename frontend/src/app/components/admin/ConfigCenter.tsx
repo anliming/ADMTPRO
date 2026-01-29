@@ -50,7 +50,7 @@ const parseValue = (input: string) => {
   return input;
 };
 
-export function ConfigCenter() {
+export function ConfigCenter({ externalSection }: { externalSection?: 'configs' | 'history' }) {
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [activeSection, setActiveSection] = useState<'configs' | 'history'>('configs');
@@ -82,6 +82,12 @@ export function ConfigCenter() {
   useEffect(() => {
     loadConfigs();
   }, []);
+
+  useEffect(() => {
+    if (externalSection === 'configs' || externalSection === 'history') {
+      setActiveSection(externalSection);
+    }
+  }, [externalSection]);
 
   const categories = useMemo(() => Array.from(new Set(configs.map((c) => c.category))), [configs]);
 

@@ -36,6 +36,7 @@ export function AdminDashboard({ username, onLogout }: AdminDashboardProps) {
   const appName = appConfig.APP_NAME || 'ADMTPRO';
   const logoUrl = appConfig.APP_LOGO_URL || '';
   const [activeTab, setActiveTab] = useState('users');
+  const [configSection, setConfigSection] = useState<'configs' | 'history'>('configs');
   const navItems = [
     {
       key: 'users',
@@ -59,7 +60,7 @@ export function AdminDashboard({ username, onLogout }: AdminDashboardProps) {
       key: 'config',
       label: '配置中心',
       icon: Settings,
-      children: ['系统配置'],
+      children: ['系统配置', '配置变更历史'],
     },
     {
       key: 'health',
@@ -101,14 +102,30 @@ export function AdminDashboard({ username, onLogout }: AdminDashboardProps) {
                     const active = activeTab === item.key;
                     return (
                       <SidebarMenuItem key={item.key}>
-                        <SidebarMenuButton isActive={active} onClick={() => setActiveTab(item.key)}>
+                      <SidebarMenuButton
+                        isActive={active}
+                        onClick={() => {
+                          setActiveTab(item.key);
+                          if (item.key === 'config') {
+                            setConfigSection('configs');
+                          }
+                        }}
+                      >
                           <Icon className="w-4 h-4" />
                           <span>{item.label}</span>
                         </SidebarMenuButton>
                         <SidebarMenuSub>
                           {item.children.map((child) => (
                             <SidebarMenuSubItem key={child}>
-                              <SidebarMenuSubButton isActive={active} onClick={() => setActiveTab(item.key)}>
+                              <SidebarMenuSubButton
+                                isActive={active}
+                                onClick={() => {
+                                  setActiveTab(item.key);
+                                  if (item.key === 'config') {
+                                    setConfigSection(child === '配置变更历史' ? 'history' : 'configs');
+                                  }
+                                }}
+                              >
                                 {child}
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
@@ -142,7 +159,7 @@ export function AdminDashboard({ username, onLogout }: AdminDashboardProps) {
             {activeTab === 'users' && <UserManagement />}
             {activeTab === 'ou' && <OUManagement />}
             {activeTab === 'audit' && <AuditLogComponent />}
-            {activeTab === 'config' && <ConfigCenter />}
+            {activeTab === 'config' && <ConfigCenter externalSection={configSection} />}
             {activeTab === 'health' && <SystemHealthComponent />}
           </div>
         </SidebarInset>
