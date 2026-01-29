@@ -70,7 +70,8 @@ export function AuditLogComponent() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold">审计日志</h2>
-          <p className="text-sm text-muted-foreground mt-1">查看系统操作记录，共 {logs.length} 条日志</p>
+          <p className="text-sm text-muted-foreground mt-1">查看系统操作记录</p>
+          <p className="text-sm text-muted-foreground">共 {logs.length} 条日志</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={loadLogs} disabled={isLoading}>

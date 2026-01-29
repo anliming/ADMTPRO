@@ -291,9 +291,8 @@ export function UserManagement() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold">用户管理</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理系统用户，共 {users.length} 个用户
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">管理系统用户</p>
+          <p className="text-sm text-muted-foreground">共 {total} 个用户</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExport}>

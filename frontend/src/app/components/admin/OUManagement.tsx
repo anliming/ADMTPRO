@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Badge } from '@/app/components/ui/badge';
-import { FolderPlus, Edit, Trash2, RefreshCw } from 'lucide-react';
+import { FolderPlus, Edit, Trash2, RefreshCw, Search } from 'lucide-react';
 import { ouApi, configApi, type OU } from '@/app/utils/api';
 import { toast } from 'sonner';
 
@@ -156,9 +156,8 @@ export function OUManagement() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold">OU管理</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理组织单元 (Organizational Unit)，共 {ous.length} 个OU
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">管理组织单元 (Organizational Unit)</p>
+          <p className="text-sm text-muted-foreground">共 {filteredOus.length} 个OU</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={loadOus} disabled={isLoading}>
@@ -225,15 +224,23 @@ export function OUManagement() {
       </div>
 
       <div className="flex items-center gap-4">
-        <Input
-          placeholder="搜索 OU 名称 / DN / 描述"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
+        <div className="relative max-w-xs w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="搜索 OU 名称 / DN / 描述"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => {
             setPage(1);
           }}
-          className="max-w-xs"
-        />
+        >
+          查询
+        </Button>
         <div className="flex items-center gap-2">
           <Label>每页</Label>
           <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>

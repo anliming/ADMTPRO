@@ -118,9 +118,8 @@ export function ConfigCenter() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold">配置中心</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理系统配置参数，共 {configs.length} 项配置
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">管理系统配置参数</p>
+          <p className="text-sm text-muted-foreground">共 {configs.length} 项配置</p>
         </div>
         <Button variant="outline" onClick={loadConfigs} disabled={isLoading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
