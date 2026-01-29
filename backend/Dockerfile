@@ -17,4 +17,4 @@ RUN apt-get update \
 
 RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY . /app
-CMD ["python", "-m", "app"]
+CMD ["gunicorn", "-w", "3", "-b", "0.0.0.0:8000", "app:create_app()"]

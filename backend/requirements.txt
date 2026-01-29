@@ -5,3 +5,4 @@ psycopg[binary]==3.2.1
 redis==5.0.8
 pyotp==2.9.0
 requests==2.32.3
+gunicorn==22.0.0
