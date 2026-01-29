@@ -360,7 +360,25 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             刷新
           </Button>
-          <Button onClick={() => setShowAddUser(true)}>
+          <Button
+            onClick={() => {
+              setFormData({
+                username: '',
+                name: '',
+                email: '',
+                phone: '',
+                department: '',
+                position: '',
+                ou: '',
+                accountExpiryDate: '',
+                passwordExpiryDate: '',
+                passwordNeverExpires: false,
+                password: '',
+                mustChangePassword: true,
+              });
+              setShowAddUser(true);
+            }}
+          >
             <UserPlus className="w-4 h-4 mr-2" />
             新增用户
           </Button>

@@ -73,6 +73,8 @@ docker compose up --build
   - `PASSWORD_EXPIRY_ENABLE`
   - `PASSWORD_EXPIRY_DAYS` (e.g. `7,3,1`)
   - `PASSWORD_EXPIRY_CHECK_INTERVAL`
+- Session
+  - `SESSION_TTL`
 - Email (optional)
   - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM`
   - `SMTP_SSL` / `SMTP_TLS`

@@ -32,7 +32,7 @@ def load_config() -> dict:
         "APP_FOOTER_ENABLED": os.getenv("APP_FOOTER_ENABLED", "true").lower() == "true",
         "API_HOST": os.getenv("API_HOST", "0.0.0.0"),
         "API_PORT": _get_int("API_PORT", 8000),
-        "SESSION_TTL": _get_int("SESSION_TTL", 1800),
+        "SESSION_TTL": _get_int("SESSION_TTL", 7200),
         "DB_URL": os.getenv("DB_URL", ""),
         "SMS_CODE_TTL": _get_int("SMS_CODE_TTL", 300),
         "SMS_SEND_INTERVAL": _get_int("SMS_SEND_INTERVAL", 60),

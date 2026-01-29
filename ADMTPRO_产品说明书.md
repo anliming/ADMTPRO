@@ -96,6 +96,7 @@ ADMTPRO 是一套面向 AD 域控的管理平台，提供用户、OU、权限、
 - `APP_THEME_BG`
 - `APP_ALERT_BG`
 - `APP_BROWSER_TITLE`：浏览器标题
+- `SESSION_TTL`：登录会话有效期（秒）
 
 ### 3.3 启动方式
 ```bash
