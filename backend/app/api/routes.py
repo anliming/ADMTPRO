@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from flask import Blueprint, current_app, jsonify, request
 
 from ..adapters.ldap_client import LDAPClient
@@ -29,6 +31,12 @@ from ..core.errors import ADConnectionError
 api_bp = Blueprint("api", __name__)
 
 OTP_TOKEN_TTL = 300
+
+
+def _date_to_filetime(date_str: str) -> int:
+    dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    base = datetime(1601, 1, 1, tzinfo=timezone.utc)
+    return int((dt - base).total_seconds() * 10_000_000)
 
 
 def _ldap_client() -> LDAPClient:
@@ -580,6 +588,15 @@ def update_user(username: str):
     for key in ["mail", "mobile", "department", "title", "displayName"]:
         if key in payload:
             changes[key] = payload[key]
+    if "accountExpiryDate" in payload:
+        account_expiry = payload.get("accountExpiryDate") or ""
+        if account_expiry:
+            try:
+                changes["accountExpires"] = _date_to_filetime(account_expiry)
+            except ValueError:
+                return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
+        else:
+            changes["accountExpires"] = 0
     if not changes:
         return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
     ldap_client = _ldap_client()

@@ -46,6 +46,8 @@ export function UserManagement() {
     department: '',
     position: '',
     ou: '',
+    accountExpiryDate: '',
+    passwordExpiryDate: '',
     password: '',
     mustChangePassword: true,
   });
@@ -179,6 +181,8 @@ export function UserManagement() {
         department: '',
         position: '',
         ou: '',
+        accountExpiryDate: '',
+        passwordExpiryDate: '',
         password: '',
         mustChangePassword: true,
       });
@@ -199,6 +203,7 @@ export function UserManagement() {
         mobile: formData.phone,
         department: formData.department,
         title: formData.position,
+        accountExpiryDate: formData.accountExpiryDate || '',
       });
 
       if (formData.ou && formData.ou !== selectedUserOu) {
@@ -280,6 +285,8 @@ export function UserManagement() {
       department: user.department || '',
       position: user.title || '',
       ou: ouDn,
+      accountExpiryDate: user.account_expiry_date || '',
+      passwordExpiryDate: user.password_expiry_date || '',
       password: '',
       mustChangePassword: true,
     });
@@ -684,6 +691,19 @@ export function UserManagement() {
                   value={formData.position}
                   onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-account-expiry">账户到期时间</Label>
+                <Input
+                  id="edit-account-expiry"
+                  type="date"
+                  value={formData.accountExpiryDate}
+                  onChange={(e) => setFormData({ ...formData, accountExpiryDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-password-expiry">密码到期时间</Label>
+                <Input id="edit-password-expiry" type="date" value={formData.passwordExpiryDate} disabled />
               </div>
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="edit-ou">组织单元 (OU)</Label>

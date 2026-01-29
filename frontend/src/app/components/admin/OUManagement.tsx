@@ -7,8 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Badge } from '@/app/components/ui/badge';
-import { FolderPlus, Edit, Trash2, RefreshCw, Search } from 'lucide-react';
-import { ouApi, configApi, type OU } from '@/app/utils/api';
+import { FolderPlus, Edit, Trash2, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import { ouApi, configApi, userApi, type OU, type User } from '@/app/utils/api';
 import { toast } from 'sonner';
 
 type ViewOU = OU & { parentDn?: string };
@@ -31,9 +31,13 @@ export function OUManagement() {
     description: '',
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [pageSize, setPageSize] = useState(15);
-  const [page, setPage] = useState(1);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [showOuUsers, setShowOuUsers] = useState(false);
+  const [ouUsers, setOuUsers] = useState<User[]>([]);
+  const [ouUsersTotal, setOuUsersTotal] = useState(0);
+  const [ouUsersPage, setOuUsersPage] = useState(1);
+  const [ouUsersPageSize, setOuUsersPageSize] = useState(15);
+  const [ouUsersLoading, setOuUsersLoading] = useState(false);
 
   const loadConfig = async () => {
     try {
@@ -60,10 +64,29 @@ export function OUManagement() {
     }
   };
 
+  const loadOuUsers = async (ouDn: string) => {
+    setOuUsersLoading(true);
+    try {
+      const res = await userApi.list({ ou: ouDn, page: ouUsersPage, pageSize: ouUsersPageSize });
+      setOuUsers(res.items || []);
+      setOuUsersTotal(res.total || 0);
+    } catch (err: any) {
+      toast.error(err.message || '加载OU用户失败');
+    } finally {
+      setOuUsersLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadConfig();
     loadOus();
   }, []);
+
+  useEffect(() => {
+    if (showOuUsers && selectedOU) {
+      loadOuUsers(selectedOU.dn);
+    }
+  }, [showOuUsers, selectedOU, ouUsersPage, ouUsersPageSize]);
 
   const ouOptions = useMemo(() => {
     return ous.map((o) => ({
@@ -72,23 +95,50 @@ export function OUManagement() {
     }));
   }, [ous]);
 
-  const filteredOus = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return ous;
-    return ous.filter((o) => {
-      const name = (o.name || '').toLowerCase();
-      const dn = (o.dn || '').toLowerCase();
-      const desc = (o.description || '').toLowerCase();
-      return name.includes(query) || dn.includes(query) || desc.includes(query);
+  const childrenMap = useMemo(() => {
+    const map: Record<string, ViewOU[]> = {};
+    ous.forEach((ou) => {
+      const parent = ou.parentDn || '';
+      if (!map[parent]) map[parent] = [];
+      map[parent].push(ou);
     });
-  }, [ous, searchTerm]);
+    Object.values(map).forEach((items) => {
+      items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    });
+    return map;
+  }, [ous]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredOus.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pagedOus = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredOus.slice(start, start + pageSize);
-  }, [filteredOus, currentPage, pageSize]);
+  const rootOus = useMemo(() => {
+    if (baseDn) {
+      return childrenMap[baseDn] || [];
+    }
+    const dnSet = new Set(ous.map((ou) => ou.dn));
+    return ous.filter((ou) => !dnSet.has(ou.parentDn || ''));
+  }, [baseDn, childrenMap, ous]);
+
+  const flattenedOus = useMemo(() => {
+    const items: Array<{ ou: ViewOU; depth: number; hasChildren: boolean }> = [];
+    const visit = (ou: ViewOU, depth: number) => {
+      const children = childrenMap[ou.dn] || [];
+      const hasChildren = children.length > 0;
+      items.push({ ou, depth, hasChildren });
+      if (hasChildren && expanded[ou.dn]) {
+        children.forEach((child) => visit(child, depth + 1));
+      }
+    };
+    rootOus.forEach((ou) => visit(ou, 0));
+    return items;
+  }, [childrenMap, expanded, rootOus]);
+
+  const handleToggleOu = (ou: ViewOU, hasChildren: boolean) => {
+    if (hasChildren) {
+      setExpanded((prev) => ({ ...prev, [ou.dn]: !prev[ou.dn] }));
+      return;
+    }
+    setSelectedOU(ou);
+    setOuUsersPage(1);
+    setShowOuUsers(true);
+  };
 
   const handleAddOU = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,13 +201,16 @@ export function OUManagement() {
     setShowEditOU(true);
   };
 
+  const ouUsersTotalPages = Math.max(1, Math.ceil(ouUsersTotal / ouUsersPageSize));
+  const ouUsersCurrentPage = Math.min(ouUsersPage, ouUsersTotalPages);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold">OU管理</h2>
           <p className="text-sm text-muted-foreground mt-1">管理组织单元 (Organizational Unit)</p>
-          <p className="text-sm text-muted-foreground">共 {filteredOus.length} 个OU</p>
+          <p className="text-sm text-muted-foreground">共 {ous.length} 个OU</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={loadOus} disabled={isLoading}>
@@ -223,56 +276,8 @@ export function OUManagement() {
         </Dialog>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative max-w-xs w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="搜索 OU 名称 / DN / 描述"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setPage(1);
-          }}
-        >
-          查询
-        </Button>
-        <div className="flex items-center gap-2">
-          <Label>每页</Label>
-          <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="15">15</SelectItem>
-              <SelectItem value="30">30</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="text-sm text-muted-foreground">
-          第 {currentPage} / {totalPages} 页
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(Math.max(1, currentPage - 1))}
-          disabled={currentPage <= 1}
-        >
-          上一页
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage >= totalPages}
-        >
-          下一页
-        </Button>
+      <div className="text-sm text-muted-foreground">
+        点击OU展开下级，点击末级OU查看用户。
       </div>
 
       {/* Table */}
@@ -293,30 +298,56 @@ export function OUManagement() {
                   正在加载...
                 </TableCell>
               </TableRow>
-            ) : filteredOus.length === 0 ? (
+            ) : ous.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                   暂无OU
                 </TableCell>
               </TableRow>
             ) : (
-              pagedOus.map((ou) => (
-                <TableRow key={ou.dn}>
+              flattenedOus.map(({ ou, depth, hasChildren }) => (
+                <TableRow
+                  key={ou.dn}
+                  className="cursor-pointer"
+                  onClick={() => handleToggleOu(ou, hasChildren)}
+                >
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {ou.parentDn && <span className="text-muted-foreground">└─</span>}
-                      {ou.name || ou.dn}
-                      {!ou.parentDn && <Badge variant="outline">根OU</Badge>}
+                    <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 16}px` }}>
+                      {hasChildren ? (
+                        expanded[ou.dn] ? (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        )
+                      ) : (
+                        <span className="w-4 h-4" />
+                      )}
+                      <span>{ou.name || ou.dn}</span>
+                      {baseDn && ou.parentDn === baseDn && <Badge variant="outline">顶级OU</Badge>}
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{ou.dn}</TableCell>
                   <TableCell className="text-sm">{ou.description || '-'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => openEditDialog(ou)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditDialog(ou);
+                        }}
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDeleteOU(ou)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteOU(ou);
+                        }}
+                      >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
@@ -360,6 +391,94 @@ export function OUManagement() {
               <Button type="submit">保存</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showOuUsers} onOpenChange={setShowOuUsers}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>OU 用户列表</DialogTitle>
+            <DialogDescription>
+              {selectedOU?.name || selectedOU?.dn || ''} 的用户
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>共 {ouUsersTotal} 个用户</span>
+            <div className="flex items-center gap-2">
+              <Label>每页</Label>
+              <Select
+                value={String(ouUsersPageSize)}
+                onValueChange={(v) => {
+                  setOuUsersPageSize(Number(v));
+                  setOuUsersPage(1);
+                }}
+              >
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">15</SelectItem>
+                  <SelectItem value="30">30</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <span>
+                第 {ouUsersCurrentPage} / {ouUsersTotalPages} 页
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setOuUsersPage(Math.max(1, ouUsersCurrentPage - 1))}
+                disabled={ouUsersCurrentPage <= 1}
+              >
+                上一页
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setOuUsersPage(Math.min(ouUsersTotalPages, ouUsersCurrentPage + 1))}
+                disabled={ouUsersCurrentPage >= ouUsersTotalPages}
+              >
+                下一页
+              </Button>
+            </div>
+          </div>
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>用户名</TableHead>
+                  <TableHead>姓名</TableHead>
+                  <TableHead>邮箱</TableHead>
+                  <TableHead>手机号</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ouUsersLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                      正在加载...
+                    </TableCell>
+                  </TableRow>
+                ) : ouUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                      暂无用户
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  ouUsers.map((user) => (
+                    <TableRow key={user.sAMAccountName}>
+                      <TableCell>{user.sAMAccountName}</TableCell>
+                      <TableCell>{user.displayName || '-'}</TableCell>
+                      <TableCell>{user.mail || '-'}</TableCell>
+                      <TableCell>{user.mobile || '-'}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

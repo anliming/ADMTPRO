@@ -77,6 +77,7 @@ class LDAPClient:
                 "title",
                 "memberOf",
                 "msDS-UserPasswordExpiryTimeComputed",
+                "accountExpires",
             ],
         ):
             return None
@@ -91,6 +92,9 @@ class LDAPClient:
             now = datetime.now(timezone.utc)
             days_left = max((expiry_dt - now).days, 0)
             expiry_date = expiry_dt.date().isoformat()
+        account_raw = getattr(entry, "accountExpires", None)
+        account_dt = _filetime_to_datetime(account_raw.value if account_raw else None)
+        account_expiry_date = account_dt.date().isoformat() if account_dt else None
         return {
             "sAMAccountName": getattr(entry, "sAMAccountName", None).value,
             "displayName": getattr(entry, "displayName", None).value,
@@ -101,6 +105,7 @@ class LDAPClient:
             "memberOf": getattr(entry, "memberOf", None).values if hasattr(entry, "memberOf") else [],
             "days_left": days_left,
             "password_expiry_date": expiry_date,
+            "account_expiry_date": account_expiry_date,
         }
 
     def is_user_admin(self, username: str, admin_group_dn: str) -> bool:
@@ -138,9 +143,20 @@ class LDAPClient:
         conn.search(
             base,
             search_filter,
-            attributes=["sAMAccountName", "displayName", "mail", "mobile", "department", "title", "userAccountControl"],
+            attributes=[
+                "sAMAccountName",
+                "displayName",
+                "mail",
+                "mobile",
+                "department",
+                "title",
+                "userAccountControl",
+                "msDS-UserPasswordExpiryTimeComputed",
+                "accountExpires",
+            ],
         )
         users = []
+        now = datetime.now(timezone.utc)
         for entry in conn.entries:
             uac = getattr(entry, "userAccountControl", None)
             uac_value = uac.value if uac else 0
@@ -149,6 +165,15 @@ class LDAPClient:
                 enabled_flag = not (int(uac_value) & 2)
             except Exception:
                 enabled_flag = True
+            expiry_raw = getattr(entry, "msDS-UserPasswordExpiryTimeComputed", None)
+            expiry_dt = _filetime_to_datetime(expiry_raw.value if expiry_raw else None)
+            password_expiry_date = expiry_dt.date().isoformat() if expiry_dt else None
+            days_left = None
+            if expiry_dt:
+                days_left = max((expiry_dt - now).days, 0)
+            account_raw = getattr(entry, "accountExpires", None)
+            account_dt = _filetime_to_datetime(account_raw.value if account_raw else None)
+            account_expiry_date = account_dt.date().isoformat() if account_dt else None
             users.append(
                 {
                     "dn": str(entry.entry_dn),
@@ -159,6 +184,9 @@ class LDAPClient:
                     "department": getattr(entry, "department", None).value,
                     "title": getattr(entry, "title", None).value,
                     "enabled": enabled_flag,
+                    "days_left": days_left,
+                    "password_expiry_date": password_expiry_date,
+                    "account_expiry_date": account_expiry_date,
                 }
             )
         return users

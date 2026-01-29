@@ -133,6 +133,7 @@ export interface User {
   mustChangePassword?: boolean;
   days_left?: number | null;
   password_expiry_date?: string | null;
+  account_expiry_date?: string | null;
 }
 
 export interface OU {
