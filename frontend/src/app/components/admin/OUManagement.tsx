@@ -232,6 +232,7 @@ export function OUManagement() {
             setSearchTerm(e.target.value);
             setPage(1);
           }}
+          className="max-w-xs"
         />
         <div className="flex items-center gap-2">
           <Label>每页</Label>
