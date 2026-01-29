@@ -709,7 +709,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
               <TableHead>手机号</TableHead>
               <TableHead>部门</TableHead>
               <TableHead>岗位</TableHead>
-              <TableHead>OU</TableHead>
+              <TableHead className="w-40">OU</TableHead>
               <TableHead>状态</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
@@ -736,8 +736,14 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
                   <TableCell>{user.mobile}</TableCell>
                   <TableCell>{user.department}</TableCell>
                   <TableCell>{user.title}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{user.ouDn || '-'}</Badge>
+                  <TableCell className="max-w-[160px]">
+                    <Badge
+                      variant="outline"
+                      className="max-w-[150px] truncate"
+                      title={user.ouDn || ''}
+                    >
+                      {user.ouDn || '-'}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
