@@ -53,6 +53,7 @@ const parseValue = (input: string) => {
 export function ConfigCenter() {
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [activeSection, setActiveSection] = useState<'configs' | 'history'>('configs');
   const [selectedConfig, setSelectedConfig] = useState<ConfigItem | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -127,104 +128,128 @@ export function ConfigCenter() {
         </Button>
       </div>
 
-      {categories.length > 0 && (
-        <Tabs defaultValue={categories[0]}>
-          <TabsList className="flex w-full flex-wrap gap-2">
-            {categories.map((category) => (
-              <TabsTrigger key={category} value={category}>
-                {category}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {categories.map((category) => (
-            <TabsContent key={category} value={category} className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="w-5 h-5" />
-                    {category} 配置
-                  </CardTitle>
-                  <CardDescription>系统配置项</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-1/3">配置项</TableHead>
-                        <TableHead className="w-1/3">值</TableHead>
-                        <TableHead>说明</TableHead>
-                        <TableHead className="text-right">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {configs
-                        .filter((c) => c.category === category)
-                        .map((config) => (
-                          <TableRow key={config.key}>
-                            <TableCell className="font-medium font-mono text-sm">{config.key}</TableCell>
-                            <TableCell className="font-mono text-sm">
-                              <Badge variant="outline">{maskIfSensitive(config.key, config.value)}</Badge>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {config.description || '-'}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button size="sm" variant="ghost" onClick={() => handleEdit(config)}>
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          ))}
-        </Tabs>
-      )}
-
-      {/* Configuration History */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="w-5 h-5" />
+      <div className="grid gap-6 md:grid-cols-[220px_1fr]">
+        <div className="flex flex-col gap-3">
+          <Button
+            variant={activeSection === 'configs' ? 'default' : 'outline'}
+            onClick={() => setActiveSection('configs')}
+            className="justify-start"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            配置项
+          </Button>
+          <Button
+            variant={activeSection === 'history' ? 'default' : 'outline'}
+            onClick={() => setActiveSection('history')}
+            className="justify-start"
+          >
+            <History className="w-4 h-4 mr-2" />
             配置变更历史
-          </CardTitle>
-          <CardDescription>最近的配置修改记录</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {history.length === 0 ? (
-            <div className="text-sm text-muted-foreground">暂无历史记录</div>
-          ) : (
-            <div className="space-y-3">
-              {history.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline">{categoryForKey(item.key)}</Badge>
-                    <div>
-                      <p className="text-sm font-medium">{item.key}</p>
-                      <p className="text-xs text-muted-foreground">值: {maskIfSensitive(item.key, item.value)}</p>
-                    </div>
-                  </div>
-                  <div className="text-right flex items-center gap-2">
-                    <div>
-                      <p className="text-xs text-muted-foreground">{item.created_at}</p>
-                      <p className="text-xs text-muted-foreground">ID: {item.id}</p>
-                    </div>
-                    <Button size="sm" variant="ghost" onClick={() => handleRollback(item.id)}>
-                      <RotateCcw className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+          </Button>
+        </div>
+
+        <div className="space-y-6">
+          {activeSection === 'configs' && categories.length > 0 && (
+            <Tabs defaultValue={categories[0]}>
+              <TabsList className="flex w-full flex-wrap gap-2">
+                {categories.map((category) => (
+                  <TabsTrigger key={category} value={category}>
+                    {category}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {categories.map((category) => (
+                <TabsContent key={category} value={category} className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Settings className="w-5 h-5" />
+                        {category} 配置
+                      </CardTitle>
+                      <CardDescription>系统配置项</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-1/3">配置项</TableHead>
+                            <TableHead className="w-1/3">值</TableHead>
+                            <TableHead>说明</TableHead>
+                            <TableHead className="text-right">操作</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {configs
+                            .filter((c) => c.category === category)
+                            .map((config) => (
+                              <TableRow key={config.key}>
+                                <TableCell className="font-medium font-mono text-sm">{config.key}</TableCell>
+                                <TableCell className="font-mono text-sm">
+                                  <Badge variant="outline">{maskIfSensitive(config.key, config.value)}</Badge>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {config.description || '-'}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <Button size="sm" variant="ghost" onClick={() => handleEdit(config)}>
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
               ))}
-            </div>
+            </Tabs>
           )}
-        </CardContent>
-      </Card>
+
+          {activeSection === 'history' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  配置变更历史
+                </CardTitle>
+                <CardDescription>最近的配置修改记录</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {history.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">暂无历史记录</div>
+                ) : (
+                  <div className="space-y-3">
+                    {history.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline">{categoryForKey(item.key)}</Badge>
+                          <div>
+                            <p className="text-sm font-medium">{item.key}</p>
+                            <p className="text-xs text-muted-foreground">值: {maskIfSensitive(item.key, item.value)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right flex items-center gap-2">
+                          <div>
+                            <p className="text-xs text-muted-foreground">{item.created_at}</p>
+                            <p className="text-xs text-muted-foreground">ID: {item.id}</p>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={() => handleRollback(item.id)}>
+                            <RotateCcw className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
 
       {/* Edit Dialog */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
