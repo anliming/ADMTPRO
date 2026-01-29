@@ -528,6 +528,8 @@ def list_users():
         enabled = True
     elif status == "disabled":
         enabled = False
+    elif not q:
+        enabled = True
     ldap_client = _ldap_client()
     users = ldap_client.search_users(query=q, ou_dn=ou, enabled=enabled)
     if not q:
