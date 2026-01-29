@@ -50,6 +50,7 @@ export function UserManagement() {
     mustChangePassword: true,
   });
   const [selectedUserOu, setSelectedUserOu] = useState('');
+  const [editOuQuery, setEditOuQuery] = useState('');
 
   const loadOus = async () => {
     try {
@@ -116,6 +117,12 @@ export function UserManagement() {
       label: o.name ? `${o.name} (${o.dn})` : o.dn,
     }));
   }, [ous]);
+
+  const filteredOuOptions = useMemo(() => {
+    const query = editOuQuery.trim().toLowerCase();
+    if (!query) return ouOptions;
+    return ouOptions.filter((o) => o.label.toLowerCase().includes(query) || o.dn.toLowerCase().includes(query));
+  }, [ouOptions, editOuQuery]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -245,6 +252,7 @@ export function UserManagement() {
     const ouDn = user.ouDn || '';
     setSelectedUser(user);
     setSelectedUserOu(ouDn);
+    setEditOuQuery('');
     setFormData({
       username: user.sAMAccountName,
       name: user.displayName || '',
@@ -661,12 +669,17 @@ export function UserManagement() {
               </div>
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="edit-ou">组织单元 (OU)</Label>
+                <Input
+                  placeholder="输入部门/OU 名称或 DN 过滤"
+                  value={editOuQuery}
+                  onChange={(e) => setEditOuQuery(e.target.value)}
+                />
                 <Select value={formData.ou} onValueChange={(v) => setFormData({ ...formData, ou: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ouOptions.map((ou) => (
+                    {filteredOuOptions.map((ou) => (
                       <SelectItem key={ou.dn} value={ou.dn}>
                         {ou.label}
                       </SelectItem>

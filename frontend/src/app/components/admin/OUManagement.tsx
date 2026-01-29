@@ -31,6 +31,9 @@ export function OUManagement() {
     description: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [pageSize, setPageSize] = useState(15);
+  const [page, setPage] = useState(1);
 
   const loadConfig = async () => {
     try {
@@ -68,6 +71,24 @@ export function OUManagement() {
       label: o.name ? `${o.name} (${o.dn})` : o.dn,
     }));
   }, [ous]);
+
+  const filteredOus = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return ous;
+    return ous.filter((o) => {
+      const name = (o.name || '').toLowerCase();
+      const dn = (o.dn || '').toLowerCase();
+      const desc = (o.description || '').toLowerCase();
+      return name.includes(query) || dn.includes(query) || desc.includes(query);
+    });
+  }, [ous, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOus.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedOus = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredOus.slice(start, start + pageSize);
+  }, [filteredOus, currentPage, pageSize]);
 
   const handleAddOU = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,6 +224,49 @@ export function OUManagement() {
         </Dialog>
       </div>
 
+      <div className="flex items-center gap-4">
+        <Input
+          placeholder="搜索 OU 名称 / DN / 描述"
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setPage(1);
+          }}
+        />
+        <div className="flex items-center gap-2">
+          <Label>每页</Label>
+          <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15">15</SelectItem>
+              <SelectItem value="30">30</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          第 {currentPage} / {totalPages} 页
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage(Math.max(1, currentPage - 1))}
+          disabled={currentPage <= 1}
+        >
+          上一页
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage >= totalPages}
+        >
+          下一页
+        </Button>
+      </div>
+
       {/* Table */}
       <div className="border rounded-lg">
         <Table>
@@ -221,14 +285,14 @@ export function OUManagement() {
                   正在加载...
                 </TableCell>
               </TableRow>
-            ) : ous.length === 0 ? (
+            ) : filteredOus.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                   暂无OU
                 </TableCell>
               </TableRow>
             ) : (
-              ous.map((ou) => (
+              pagedOus.map((ou) => (
                 <TableRow key={ou.dn}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
