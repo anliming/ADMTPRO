@@ -51,6 +51,7 @@ export function UserManagement() {
   });
   const [selectedUserOu, setSelectedUserOu] = useState('');
   const [editOuQuery, setEditOuQuery] = useState('');
+  const [ouMatchHint, setOuMatchHint] = useState('');
 
   const loadOus = async () => {
     try {
@@ -123,6 +124,24 @@ export function UserManagement() {
     if (!query) return ouOptions;
     return ouOptions.filter((o) => o.label.toLowerCase().includes(query) || o.dn.toLowerCase().includes(query));
   }, [ouOptions, editOuQuery]);
+
+  useEffect(() => {
+    const query = editOuQuery.trim();
+    if (!query) {
+      setOuMatchHint('');
+      return;
+    }
+    if (filteredOuOptions.length === 1) {
+      setFormData((prev) => ({ ...prev, ou: filteredOuOptions[0].dn }));
+      setOuMatchHint('已自动匹配到唯一 OU');
+      return;
+    }
+    if (filteredOuOptions.length > 1) {
+      setOuMatchHint(`匹配到 ${filteredOuOptions.length} 个 OU，请从列表中选择一个`);
+      return;
+    }
+    setOuMatchHint('未匹配到 OU，请调整关键字');
+  }, [editOuQuery, filteredOuOptions.length]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -674,6 +693,9 @@ export function UserManagement() {
                   value={editOuQuery}
                   onChange={(e) => setEditOuQuery(e.target.value)}
                 />
+                {ouMatchHint && (
+                  <div className="text-xs text-muted-foreground">{ouMatchHint}</div>
+                )}
                 <Select value={formData.ou} onValueChange={(v) => setFormData({ ...formData, ou: v })}>
                   <SelectTrigger>
                     <SelectValue />
