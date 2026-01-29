@@ -53,6 +53,8 @@ def send_email(
     smtp_user: str,
     smtp_password: str,
     smtp_from: str,
+    smtp_ssl: bool,
+    smtp_tls: bool,
     to_email: str,
     subject: str,
     body: str,
@@ -63,8 +65,13 @@ def send_email(
     msg["To"] = to_email
     msg.set_content(body)
 
-    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-        server.starttls()
+    if smtp_ssl:
+        server_ctx = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10)
+    else:
+        server_ctx = smtplib.SMTP(smtp_host, smtp_port, timeout=10)
+    with server_ctx as server:
+        if smtp_tls and not smtp_ssl:
+            server.starttls()
         if smtp_user and smtp_password:
             server.login(smtp_user, smtp_password)
         server.send_message(msg)

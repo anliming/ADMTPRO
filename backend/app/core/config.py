@@ -63,6 +63,8 @@ def load_config() -> dict:
         "SMTP_USER": os.getenv("SMTP_USER", ""),
         "SMTP_PASSWORD": os.getenv("SMTP_PASSWORD", ""),
         "SMTP_FROM": os.getenv("SMTP_FROM", ""),
+        "SMTP_SSL": os.getenv("SMTP_SSL", "false").lower() == "true",
+        "SMTP_TLS": os.getenv("SMTP_TLS", "true").lower() == "true",
     }
 
 
@@ -76,7 +78,15 @@ def _to_bool(value) -> bool:
 
 def apply_overrides(config: dict, overrides: dict) -> dict:
     for key, value in overrides.items():
-        if key in {"PASSWORD_EXPIRY_ENABLE", "SMS_AUTO_RETRY", "APP_FOOTER_ENABLED", "LDAP_TLS_VERIFY", "LDAP_TLS_ALLOW_WEAK"}:
+        if key in {
+            "PASSWORD_EXPIRY_ENABLE",
+            "SMS_AUTO_RETRY",
+            "APP_FOOTER_ENABLED",
+            "LDAP_TLS_VERIFY",
+            "LDAP_TLS_ALLOW_WEAK",
+            "SMTP_SSL",
+            "SMTP_TLS",
+        }:
             config[key] = _to_bool(value)
         elif key in {
             "SMS_SEND_INTERVAL",

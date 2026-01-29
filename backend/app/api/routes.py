@@ -425,6 +425,8 @@ def send_email_code():
             ]
         ):
             return jsonify({"code": "CONFIG_ERROR", "message": "邮件配置不完整"}), 500
+        if current_app.config["SMTP_SSL"] and current_app.config["SMTP_TLS"]:
+            current_app.logger.warning("SMTP_SSL and SMTP_TLS both enabled; SSL will take precedence.")
         try:
             send_email(
                 smtp_host=current_app.config["SMTP_HOST"],
@@ -432,11 +434,22 @@ def send_email_code():
                 smtp_user=current_app.config["SMTP_USER"],
                 smtp_password=current_app.config["SMTP_PASSWORD"],
                 smtp_from=current_app.config["SMTP_FROM"],
+                smtp_ssl=current_app.config["SMTP_SSL"],
+                smtp_tls=current_app.config["SMTP_TLS"],
                 to_email=email,
                 subject="ADMTPRO 密码重置验证码",
                 body=f"您的验证码是：{code}，有效期 {current_app.config['SMS_CODE_TTL']} 秒。",
             )
         except Exception as exc:
+            current_app.logger.exception(
+                "email send failed: user=%s email=%s smtp=%s:%s ssl=%s tls=%s",
+                username,
+                email,
+                current_app.config["SMTP_HOST"],
+                current_app.config["SMTP_PORT"],
+                current_app.config["SMTP_SSL"],
+                current_app.config["SMTP_TLS"],
+            )
             _audit({"username": username, "role": "user"}, "EMAIL_SEND", username, "error", str(exc))
             return jsonify({"code": "EMAIL_ERROR", "message": "邮件发送失败"}), 502
     _audit({"username": username, "role": "user"}, "EMAIL_SEND", username, "ok")
