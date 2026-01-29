@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import pyotp
@@ -42,6 +43,10 @@ def enable_secret(db_url: str, username: str) -> None:
 def verify_code(secret: str, code: str, window: int) -> bool:
     totp = pyotp.TOTP(secret, interval=window)
     return totp.verify(code, valid_window=1)
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def record_action_otp(db_url: str, username: str, ttl_minutes: int) -> None:
