@@ -194,6 +194,10 @@ export function UserDashboard({ username, onLogout }: UserDashboardProps) {
                   </Badge>
                 </span>
               </div>
+              <div className="grid grid-cols-3 gap-2">
+                <span className="text-sm text-muted-foreground">到期日期:</span>
+                <span className="col-span-2 text-sm">{user?.password_expiry_date || '-'}</span>
+              </div>
               
               <Button className="w-full" onClick={() => setShowChangePassword(true)}>
                 <Lock className="w-4 h-4 mr-2" />
