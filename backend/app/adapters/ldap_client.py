@@ -100,8 +100,17 @@ class LDAPClient:
             days_left = max((expiry_dt - now).days, 0)
             expiry_date = expiry_dt.date().isoformat()
         account_raw = getattr(entry, "accountExpires", None)
-        account_dt = _filetime_to_datetime(account_raw.value if account_raw else None)
+        account_raw_value = account_raw.value if account_raw else None
+        account_dt = _filetime_to_datetime(account_raw_value)
+        if not account_dt and account_raw_value and str(account_raw_value).isdigit():
+            account_dt = _filetime_to_datetime(str(account_raw_value))
         account_expiry_date = account_dt.date().isoformat() if account_dt else None
+        logger.info(
+            "AD accountExpires read: user=%s raw=%s parsed=%s",
+            username,
+            account_raw_value,
+            account_expiry_date,
+        )
         uac = getattr(entry, "userAccountControl", None)
         uac_value = uac.value if uac else 0
         pwd_never_expires = False
@@ -192,7 +201,10 @@ class LDAPClient:
             if expiry_dt:
                 days_left = max((expiry_dt - now).days, 0)
             account_raw = getattr(entry, "accountExpires", None)
-            account_dt = _filetime_to_datetime(account_raw.value if account_raw else None)
+            account_raw_value = account_raw.value if account_raw else None
+            account_dt = _filetime_to_datetime(account_raw_value)
+            if not account_dt and account_raw_value and str(account_raw_value).isdigit():
+                account_dt = _filetime_to_datetime(str(account_raw_value))
             account_expiry_date = account_dt.date().isoformat() if account_dt else None
             users.append(
                 {
