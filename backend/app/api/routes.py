@@ -142,6 +142,7 @@ def login():
 
     ldap_client = _ldap_client()
     if not ldap_client.authenticate_user(username, password):
+        current_app.logger.warning("login failed: username=%s role=%s", username, role_hint)
         record_fail(
             current_app.config["DB_URL"],
             username,
@@ -568,6 +569,7 @@ def change_password():
             code = "AD_POLICY_VIOLATION"
         _audit(actor, "PASSWORD_CHANGE_SELF", username, "error", message)
         return jsonify({"code": code, "message": "密码策略不符合要求"}), 400
+    current_app.logger.info("self change password success: user=%s", username)
     _audit(actor, "PASSWORD_CHANGE_SELF", username, "ok")
     return jsonify({"status": "ok"})
 

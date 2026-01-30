@@ -64,8 +64,8 @@ class LDAPClient:
             conn = Connection(self._server(), user=user_dn, password=password, auto_bind=True)
             conn.unbind()
             return True
-        except LDAPException:
-            logger.warning("AD user bind failed: username=%s dn=%s", username, user_dn)
+        except LDAPException as exc:
+            logger.warning("AD user bind failed: username=%s dn=%s error=%s", username, user_dn, exc)
             return False
 
     def get_user_info(self, username: str) -> Optional[dict]:
@@ -301,8 +301,10 @@ class LDAPClient:
         except LDAPException as exc:
             logger.warning("AD change password bind failed: username=%s dn=%s", username, user_dn)
             raise ADConnectionError("old password invalid") from exc
-        self._set_password(conn, user_dn, new_password)
-        logger.info("AD change password success: username=%s dn=%s", username, user_dn)
+        if not conn.extend.microsoft.modify_password(user_dn, new_password, old_password):
+            logger.error("AD change password failed: username=%s dn=%s result=%s", username, user_dn, conn.result)
+            raise ADConnectionError(conn.result.get("message", "change password failed"))
+        logger.info("AD change password success: username=%s dn=%s result=%s", username, user_dn, conn.result)
 
     def delete_user(self, user_dn: str) -> None:
         conn = self._service_conn()
@@ -435,6 +437,7 @@ class LDAPClient:
                 conn.result,
             )
             raise ADConnectionError(conn.result.get("message", "set password failed"))
+        logger.info("AD set password success: dn=%s result=%s", user_dn, conn.result)
 
     def _set_enabled(self, conn: Connection, user_dn: str, enabled: bool) -> None:
         current_uac = 512
