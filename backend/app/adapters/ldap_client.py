@@ -231,8 +231,9 @@ class LDAPClient:
             "userPrincipalName": user_principal,
             "objectClass": ["top", "person", "organizationalPerson", "user"],
         }
-        if attributes.get("password_never_expires") is not None:
-            attrs["userAccountControl"] = 512 | 0x10000 if attributes["password_never_expires"] else 512
+        if attributes.get("password_never_expires"):
+            # Create as disabled user with "password never expires" flag set.
+            attrs["userAccountControl"] = 0x200 | 0x2 | 0x10000
             attributes = {k: v for k, v in attributes.items() if k != "password_never_expires"}
         attrs.update(attributes)
         if not conn.add(user_dn, attributes=attrs):
@@ -418,7 +419,18 @@ class LDAPClient:
             raise ADConnectionError(conn.result.get("message", "set password failed"))
 
     def _set_enabled(self, conn: Connection, user_dn: str, enabled: bool) -> None:
-        uac = 512 if enabled else 514
+        current_uac = 512
+        try:
+            conn.search(user_dn, "(objectClass=*)", attributes=["userAccountControl"])
+            if conn.entries:
+                current_uac = getattr(conn.entries[0], "userAccountControl", None).value or 512
+            current_uac = int(current_uac)
+        except Exception:
+            current_uac = 512
+        if enabled:
+            uac = current_uac & ~0x2
+        else:
+            uac = current_uac | 0x2
         if not conn.modify(user_dn, {"userAccountControl": [(MODIFY_REPLACE, [uac])]}):
             raise ADConnectionError(conn.result.get("message", "set enabled failed"))
 
