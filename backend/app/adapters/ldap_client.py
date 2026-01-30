@@ -231,14 +231,17 @@ class LDAPClient:
             "userPrincipalName": user_principal,
             "objectClass": ["top", "person", "organizationalPerson", "user"],
         }
-        if attributes.get("password_never_expires"):
-            # Create as disabled user with "password never expires" flag set.
-            attrs["userAccountControl"] = 0x200 | 0x2 | 0x10000
+        if "password_never_expires" in attributes:
+            if attributes.get("password_never_expires"):
+                # Create as disabled user with "password never expires" flag set.
+                attrs["userAccountControl"] = 0x200 | 0x2 | 0x10000
             attributes = {k: v for k, v in attributes.items() if k != "password_never_expires"}
         attrs.update(attributes)
+        logger.info("AD create user attrs: dn=%s attrs=%s", user_dn, attrs)
         if not conn.add(user_dn, attributes=attrs):
             logger.error("AD create user failed: dn=%s result=%s", user_dn, conn.result)
             raise ADConnectionError(conn.result.get("message", "add failed"))
+        logger.info("AD create user success: dn=%s result=%s", user_dn, conn.result)
         self._set_password(conn, user_dn, password)
         if force_change:
             self._set_pwd_must_change(conn, user_dn)
@@ -264,6 +267,7 @@ class LDAPClient:
         if not conn.modify(user_dn, mod):
             logger.error("AD update user failed: dn=%s changes=%s result=%s", user_dn, changes, conn.result)
             raise ADConnectionError(conn.result.get("message", "modify failed"))
+        logger.info("AD update user success: dn=%s result=%s", user_dn, conn.result)
 
     def set_user_enabled(self, user_dn: str, enabled: bool) -> None:
         conn = self._service_conn()
@@ -274,6 +278,7 @@ class LDAPClient:
         self._set_password(conn, user_dn, new_password)
         if force_change:
             self._set_pwd_must_change(conn, user_dn)
+        logger.info("AD reset password success: dn=%s force_change=%s", user_dn, force_change)
 
     def change_password(self, username: str, old_password: str, new_password: str) -> None:
         user_dn = self.get_user_dn(username)
@@ -285,6 +290,7 @@ class LDAPClient:
             logger.warning("AD change password bind failed: username=%s dn=%s", username, user_dn)
             raise ADConnectionError("old password invalid") from exc
         self._set_password(conn, user_dn, new_password)
+        logger.info("AD change password success: username=%s dn=%s", username, user_dn)
 
     def delete_user(self, user_dn: str) -> None:
         conn = self._service_conn()
