@@ -199,6 +199,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
   const [resetTarget, setResetTarget] = useState<ViewUser | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState('');
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetForceChange, setResetForceChange] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ViewUser | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -311,6 +312,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
   const handleResetPassword = async (user: ViewUser) => {
     setResetTarget(user);
     setResetPasswordValue('');
+    setResetForceChange(false);
     setShowResetDialog(true);
   };
 
@@ -322,12 +324,13 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
     }
     try {
       await withOtpRetry(() =>
-        userApi.resetPassword(resetTarget.sAMAccountName, resetPasswordValue, true),
+        userApi.resetPassword(resetTarget.sAMAccountName, resetPasswordValue, resetForceChange),
       );
       toast.success(`已重置 ${resetTarget.displayName || resetTarget.sAMAccountName} 的密码`);
       setShowResetDialog(false);
       setResetTarget(null);
       setResetPasswordValue('');
+      setResetForceChange(false);
       await loadUsers();
     } catch (err: any) {
       toast.error(err.message || '重置密码失败');
@@ -926,17 +929,24 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
               {resetTarget?.displayName || resetTarget?.sAMAccountName || ''} 的密码将被重置
             </DialogDescription>
           </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="reset-password">新密码</Label>
-                <Input
-                  id="reset-password"
-                  type="password"
-                  value={resetPasswordValue}
-                  onChange={(e) => setResetPasswordValue(e.target.value)}
-                />
-                <div className="text-xs text-muted-foreground">{passwordPolicyHint}</div>
-              </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-password">新密码</Label>
+              <Input
+                id="reset-password"
+                type="password"
+                value={resetPasswordValue}
+                onChange={(e) => setResetPasswordValue(e.target.value)}
+              />
+              <div className="text-xs text-muted-foreground">{passwordPolicyHint}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={resetForceChange}
+                onCheckedChange={(checked) => setResetForceChange(checked)}
+              />
+              <Label>下次登录必须改密</Label>
+            </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowResetDialog(false)}>
                 取消
