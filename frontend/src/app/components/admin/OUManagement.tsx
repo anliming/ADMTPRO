@@ -495,7 +495,6 @@ export function OUManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<vo
                 <TableRow>
                   <TableHead>用户名</TableHead>
                   <TableHead>姓名</TableHead>
-                  <TableHead>邮箱</TableHead>
                   <TableHead>手机号</TableHead>
                 </TableRow>
               </TableHeader>
@@ -517,7 +516,6 @@ export function OUManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<vo
                     <TableRow key={user.sAMAccountName}>
                       <TableCell>{user.sAMAccountName}</TableCell>
                       <TableCell>{user.displayName || '-'}</TableCell>
-                      <TableCell>{user.mail || '-'}</TableCell>
                       <TableCell>{user.mobile || '-'}</TableCell>
                     </TableRow>
                   ))
