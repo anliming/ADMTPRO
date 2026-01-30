@@ -439,7 +439,7 @@ export function OUManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<vo
       </Dialog>
 
       <Dialog open={showOuUsers} onOpenChange={setShowOuUsers}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-5xl w-[90vw]">
           <DialogHeader>
             <DialogTitle>OU 用户列表</DialogTitle>
             <DialogDescription>
