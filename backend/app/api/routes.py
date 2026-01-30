@@ -612,6 +612,19 @@ def list_users():
     return jsonify({"items": items, "total": total, "page": page_i, "pageSize": page_size_i})
 
 
+@api_bp.get("/users/<username>")
+def get_user_detail(username: str):
+    actor = _require_session("admin")
+    if not actor:
+        return jsonify({"code": "PERMISSION_DENIED", "message": "无权限执行该操作"}), 403
+    ldap_client = _ldap_client()
+    info = ldap_client.get_user_info(username)
+    if not info:
+        return jsonify({"code": "OBJECT_NOT_FOUND", "message": "用户不存在"}), 404
+    info["dn"] = ldap_client.get_user_dn(username)
+    return jsonify({"item": info})
+
+
 @api_bp.post("/users")
 def create_user():
     actor = _require_session("admin")

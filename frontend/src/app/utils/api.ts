@@ -266,6 +266,10 @@ export const userApi = {
   list: (params?: { q?: string; ou?: string; status?: string; page?: number; pageSize?: number }) =>
     api.get<{ items: User[]; total: number; page: number; pageSize: number }>('/users', params),
 
+  // 用户详情
+  detail: (username: string) =>
+    api.get<{ item: User }>(`/users/${encodeURIComponent(username)}`),
+
   // 创建用户
   create: (data: {
     sAMAccountName: string;

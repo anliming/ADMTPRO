@@ -354,7 +354,7 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
     }
   };
 
-  const openEditDialog = (user: ViewUser) => {
+  const openEditDialog = async (user: ViewUser) => {
     const ouDn = user.ouDn || '';
     setSelectedUser(user);
     setSelectedUserOu(ouDn);
@@ -374,6 +374,18 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
       mustChangePassword: true,
     });
     setShowEditUser(true);
+    try {
+      const detail = await userApi.detail(user.sAMAccountName);
+      const info = detail.item || {};
+      setFormData((prev) => ({
+        ...prev,
+        accountExpiryDate: info.account_expiry_date || '',
+        passwordExpiryDate: info.password_expiry_date || '',
+        passwordNeverExpires: !!info.password_never_expires,
+      }));
+    } catch (err: any) {
+      // ignore detail failure
+    }
   };
 
   return (
