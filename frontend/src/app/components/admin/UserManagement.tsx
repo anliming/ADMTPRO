@@ -273,6 +273,23 @@ export function UserManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<
       toast.success('用户信息已更新');
       setShowEditUser(false);
       setSelectedUser(null);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.sAMAccountName === selectedUser.sAMAccountName
+            ? {
+                ...u,
+                mail: formData.email,
+                mobile: formData.phone,
+                department: formData.department,
+                title: formData.position,
+                displayName: formData.name,
+                account_expiry_date: formData.accountExpiryDate || '',
+                password_expiry_date: formData.passwordExpiryDate || u.password_expiry_date,
+                password_never_expires: formData.passwordNeverExpires,
+              }
+            : u,
+        ),
+      );
       await loadUsers();
     } catch (err: any) {
       setError(err.message || '更新失败');

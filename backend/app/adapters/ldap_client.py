@@ -468,6 +468,8 @@ def _filetime_to_datetime(value) -> Optional[datetime]:
     if value is None:
         return None
     try:
+        if isinstance(value, datetime):
+            return value.astimezone(timezone.utc)
         if isinstance(value, str):
             value = int(value)
         if value <= 0:
