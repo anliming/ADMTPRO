@@ -422,6 +422,11 @@ def forgot_reset():
         ldap_client.reset_password(user_dn, new_password)
     except ADConnectionError as exc:
         message = str(exc)
+        current_app.logger.exception(
+            "forgot reset password failed: user=%s error=%s",
+            username,
+            message,
+        )
         code = "AD_ERROR"
         if "password" in message.lower():
             code = "AD_POLICY_VIOLATION"
@@ -520,6 +525,11 @@ def email_reset():
         ldap_client.reset_password(user_dn, new_password)
     except ADConnectionError as exc:
         message = str(exc)
+        current_app.logger.exception(
+            "email reset password failed: user=%s error=%s",
+            username,
+            message,
+        )
         code = "AD_ERROR"
         if "password" in message.lower():
             code = "AD_POLICY_VIOLATION"
@@ -548,6 +558,11 @@ def change_password():
         ldap_client.change_password(username, old_password, new_password)
     except ADConnectionError as exc:
         message = str(exc)
+        current_app.logger.exception(
+            "self change password failed: user=%s error=%s",
+            username,
+            message,
+        )
         code = "AD_ERROR"
         if "password" in message.lower():
             code = "AD_POLICY_VIOLATION"
@@ -627,6 +642,13 @@ def create_user():
         )
     except ADConnectionError as exc:
         message = str(exc)
+        current_app.logger.exception(
+            "user create failed: username=%s ou=%s force_change=%s error=%s",
+            payload.get("sAMAccountName", ""),
+            payload.get("ouDn", ""),
+            force_change,
+            message,
+        )
         code = "AD_ERROR"
         if "password" in message.lower():
             code = "AD_POLICY_VIOLATION"
@@ -732,6 +754,12 @@ def reset_password(username: str):
         ldap_client.reset_password(user_dn, new_password, force_change=force_change)
     except ADConnectionError as exc:
         message = str(exc)
+        current_app.logger.exception(
+            "admin reset password failed: target=%s force_change=%s error=%s",
+            username,
+            force_change,
+            message,
+        )
         code = "AD_ERROR"
         if "password" in message.lower():
             code = "AD_POLICY_VIOLATION"

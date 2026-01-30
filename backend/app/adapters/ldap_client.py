@@ -1,3 +1,4 @@
+import logging
 import ssl
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -6,6 +7,8 @@ from ldap3 import Server, Connection, ALL, BASE, MODIFY_REPLACE, Tls
 from ldap3.core.exceptions import LDAPException
 
 from ..core.errors import ADConnectionError, ADAuthError
+
+logger = logging.getLogger(__name__)
 
 
 class LDAPClient:
@@ -39,6 +42,7 @@ class LDAPClient:
         try:
             conn = Connection(self._server(), user=self.bind_dn, password=self.bind_password, auto_bind=True)
         except LDAPException as exc:
+            logger.error("AD service bind failed: bind_dn=%s error=%s", self.bind_dn, exc)
             raise ADConnectionError(str(exc)) from exc
         return conn
 
@@ -46,6 +50,7 @@ class LDAPClient:
         conn = self._service_conn()
         search_filter = f"(sAMAccountName={username})"
         if not conn.search(self.base_dn, search_filter, attributes=["distinguishedName"]):
+            logger.warning("AD search user dn failed: username=%s result=%s", username, conn.result)
             return None
         if not conn.entries:
             return None
@@ -60,6 +65,7 @@ class LDAPClient:
             conn.unbind()
             return True
         except LDAPException:
+            logger.warning("AD user bind failed: username=%s dn=%s", username, user_dn)
             return False
 
     def get_user_info(self, username: str) -> Optional[dict]:
@@ -230,6 +236,7 @@ class LDAPClient:
             attributes = {k: v for k, v in attributes.items() if k != "password_never_expires"}
         attrs.update(attributes)
         if not conn.add(user_dn, attributes=attrs):
+            logger.error("AD create user failed: dn=%s result=%s", user_dn, conn.result)
             raise ADConnectionError(conn.result.get("message", "add failed"))
         self._set_password(conn, user_dn, password)
         if force_change:
@@ -254,6 +261,7 @@ class LDAPClient:
             changes.pop("password_never_expires", None)
         mod = {k: [(MODIFY_REPLACE, [v])] for k, v in changes.items()}
         if not conn.modify(user_dn, mod):
+            logger.error("AD update user failed: dn=%s changes=%s result=%s", user_dn, changes, conn.result)
             raise ADConnectionError(conn.result.get("message", "modify failed"))
 
     def set_user_enabled(self, user_dn: str, enabled: bool) -> None:
@@ -273,6 +281,7 @@ class LDAPClient:
         try:
             conn = Connection(self._server(), user=user_dn, password=old_password, auto_bind=True)
         except LDAPException as exc:
+            logger.warning("AD change password bind failed: username=%s dn=%s", username, user_dn)
             raise ADConnectionError("old password invalid") from exc
         self._set_password(conn, user_dn, new_password)
 
@@ -401,6 +410,11 @@ class LDAPClient:
     def _set_password(self, conn: Connection, user_dn: str, password: str) -> None:
         pwd = f'"{password}"'.encode("utf-16-le")
         if not conn.modify(user_dn, {"unicodePwd": [(MODIFY_REPLACE, [pwd])]}):
+            logger.error(
+                "AD set password failed: dn=%s result=%s",
+                user_dn,
+                conn.result,
+            )
             raise ADConnectionError(conn.result.get("message", "set password failed"))
 
     def _set_enabled(self, conn: Connection, user_dn: str, enabled: bool) -> None:
