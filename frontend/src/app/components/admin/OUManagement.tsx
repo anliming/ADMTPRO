@@ -439,7 +439,7 @@ export function OUManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<vo
       </Dialog>
 
       <Dialog open={showOuUsers} onOpenChange={setShowOuUsers}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>OU 用户列表</DialogTitle>
             <DialogDescription>
@@ -448,7 +448,7 @@ export function OUManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<vo
           </DialogHeader>
           <div className="flex flex-col gap-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
             <span>共 {ouUsersTotal} 个用户</span>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 md:justify-end md:max-w-[520px]">
               <Label>每页</Label>
               <Select
                 value={String(ouUsersPageSize)}

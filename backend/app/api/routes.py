@@ -683,10 +683,17 @@ def update_user(username: str):
         if account_expiry:
             try:
                 changes["accountExpires"] = str(_date_to_filetime(account_expiry))
+                current_app.logger.info(
+                    "set accountExpires: user=%s date=%s value=%s",
+                    username,
+                    account_expiry,
+                    changes["accountExpires"],
+                )
             except ValueError:
                 return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
         else:
             changes["accountExpires"] = 0
+            current_app.logger.info("clear accountExpires: user=%s", username)
     if not changes:
         return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
     ldap_client = _ldap_client()
@@ -700,6 +707,7 @@ def update_user(username: str):
         _audit(actor, "USER_UPDATE", username, "error", str(exc))
         return jsonify({"code": "AD_ERROR", "message": str(exc)}), 500
     after = ldap_client.get_user_info(username) or {}
+    current_app.logger.info("user update after=%s", after)
     _audit(actor, "USER_UPDATE", username, "ok", before=before, after=after)
     return jsonify({"status": "ok"})
 
