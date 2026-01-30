@@ -603,7 +603,7 @@ def list_users():
         enabled = True
     ldap_client = _ldap_client()
     users = ldap_client.search_users(query=q, ou_dn=ou, enabled=enabled)
-    if not q:
+    if not q and not ou:
         users = [u for u in users if (u.get("mobile") or "").strip()]
     total = len(users)
     start = (page_i - 1) * page_size_i
@@ -682,7 +682,7 @@ def update_user(username: str):
         account_expiry = payload.get("accountExpiryDate") or ""
         if account_expiry:
             try:
-                changes["accountExpires"] = _date_to_filetime(account_expiry)
+                changes["accountExpires"] = str(_date_to_filetime(account_expiry))
             except ValueError:
                 return jsonify({"code": "VALIDATION_ERROR", "message": "参数校验失败"}), 400
         else:

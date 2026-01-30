@@ -446,9 +446,9 @@ export function OUManagement({ onRequireOtp }: { onRequireOtp?: () => Promise<vo
               {selectedOU?.name || selectedOU?.dn || ''} 的用户
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
             <span>共 {ouUsersTotal} 个用户</span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Label>每页</Label>
               <Select
                 value={String(ouUsersPageSize)}
